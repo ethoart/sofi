@@ -1,0 +1,6 @@
+{
+  "name": "Sofi Agent Hub",
+  "description": "Multi-purpose English & Sinhala AI agent with AgentRouter frontier models, Chrome Manifest V3 side panel browser extension, Android APK builder, and voice mode.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

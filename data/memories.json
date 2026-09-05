@@ -1,0 +1,47 @@
+[
+  {
+    "id": "mem-fb6014ec",
+    "category": "language_word",
+    "summary": "Learned word: කරුණාකර = Please",
+    "detail": "Vocabulary term 'කරුණාකර' translates to 'Please'.",
+    "source": "voice_command",
+    "learnedAt": "2026-09-04T05:03:20.479Z",
+    "usageCount": 1
+  },
+  {
+    "id": "mem-5e25805b",
+    "category": "preference",
+    "summary": "I love developing web apps in TypeScript and Sinhala",
+    "detail": "I love developing web apps in TypeScript and Sinhala",
+    "source": "voice_command",
+    "learnedAt": "2026-09-04T05:03:16.635Z",
+    "usageCount": 1
+  },
+  {
+    "id": "mem-1",
+    "category": "personal_fact",
+    "summary": "User operates Sofi on an AWS t3.small instance",
+    "detail": "User manages server infrastructure connected via Cloudflare Zero Trust tunnel.",
+    "source": "profile",
+    "learnedAt": "2026-09-03T05:03:09.630Z",
+    "usageCount": 4
+  },
+  {
+    "id": "mem-2",
+    "category": "preference",
+    "summary": "Prefers bilingual English and Sinhala voice interaction",
+    "detail": "User activates Sofi using voice wake words 'Sofi' or 'සොෆී'.",
+    "source": "voice_command",
+    "learnedAt": "2026-09-03T17:03:09.630Z",
+    "usageCount": 7
+  },
+  {
+    "id": "mem-3",
+    "category": "task_rule",
+    "summary": "Keep client interface focused without admin clutter",
+    "detail": "User prefers the client portal to behave like a clean conversational AI app, with server admin isolated in /sofiadmin.",
+    "source": "learned",
+    "learnedAt": "2026-09-04T05:03:09.630Z",
+    "usageCount": 2
+  }
+]

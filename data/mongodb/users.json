@@ -1,0 +1,34 @@
+[
+  {
+    "_id": "6a9b041714cee4d02573399b",
+    "username": "user",
+    "email": "user@sofi.aws",
+    "passwordHash": "6404f1980a3ab30bd05e12721628fdc5233e75f40d01737889f26644b0b19b37",
+    "name": "Alex Perera",
+    "nickname": "Alex",
+    "isGuest": false,
+    "isEmailVerified": true,
+    "role": "member",
+    "createdAt": "2026-09-04T17:47:03.175Z"
+  },
+  {
+    "_id": "6a9b041e75630727bbc5c815",
+    "username": "guest_5734",
+    "email": "guest_5734@sofi.guest",
+    "name": "Guest User 5734",
+    "nickname": "Guest",
+    "isGuest": true,
+    "role": "guest",
+    "createdAt": "2026-09-04T17:47:10.719Z"
+  },
+  {
+    "_id": "6a9b21d0773f09bb7bd1b9ff",
+    "username": "guest_6149",
+    "email": "guest_6149@sofi.guest",
+    "name": "Guest User 6149",
+    "nickname": "Guest",
+    "isGuest": true,
+    "role": "guest",
+    "createdAt": "2026-09-04T19:53:52.371Z"
+  }
+]

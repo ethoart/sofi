@@ -1,0 +1,34 @@
+[
+  {
+    "id": "voc-48c281ff",
+    "term": "කරුණාකර",
+    "translation": "Please",
+    "language": "sinhala",
+    "sampleUsage": "කරුණාකර (Please)",
+    "learnedAt": "2026-09-04T05:03:20.479Z"
+  },
+  {
+    "id": "voc-1",
+    "term": "ආයුබෝවන් (Ayubowan)",
+    "translation": "May you live long / Formal Sinhala Greeting",
+    "language": "sinhala",
+    "sampleUsage": "ආයුබෝවන්! මම සොෆී, ඔබේ කෘතිම බුද්ධි සහායිකාවයි.",
+    "learnedAt": "2026-09-03T05:03:09.630Z"
+  },
+  {
+    "id": "voc-2",
+    "term": "ස්තූතියි (Sthuthiyi)",
+    "translation": "Thank you",
+    "language": "sinhala",
+    "sampleUsage": "ඔබට බොහොම ස්තූතියි!",
+    "learnedAt": "2026-09-03T17:03:09.630Z"
+  },
+  {
+    "id": "voc-3",
+    "term": "සොෆී (Sofi)",
+    "translation": "Sofi AI assistant name in Sinhala script",
+    "language": "sinhala",
+    "sampleUsage": "සොෆී, අද දවසේ කාලගුණය කොහොමද?",
+    "learnedAt": "2026-09-04T05:03:09.630Z"
+  }
+]
