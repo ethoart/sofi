@@ -578,6 +578,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     setIsTyping(true);
 
     try {
+      const storedAgentRouterKey = typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "";
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -591,7 +592,14 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           selectedModel,
           attachments: currentAttachments,
           forceWebSearch: isWebSearchEnabled,
-          userProfile
+          agentRouterKey: storedAgentRouterKey || userProfile?.preferences?.agentRouterKey,
+          userProfile: {
+            ...userProfile,
+            preferences: {
+              ...(userProfile?.preferences || {}),
+              agentRouterKey: storedAgentRouterKey || userProfile?.preferences?.agentRouterKey
+            }
+          }
         })
       });
 

@@ -59,14 +59,14 @@ export interface RouterOutput {
 }
 
 export function getAgentRouterKey(input?: RouterInput): string | null {
-  const profileKey = input?.userProfile?.preferences?.agentRouterKey;
-  if (profileKey && typeof profileKey === "string" && profileKey.trim()) {
-    return profileKey.trim();
-  }
-
   const explicitKey = (input as any)?.agentRouterKey || (input as any)?.customApiKey;
   if (explicitKey && typeof explicitKey === "string" && explicitKey.trim()) {
     return explicitKey.trim();
+  }
+
+  const profileKey = input?.userProfile?.preferences?.agentRouterKey;
+  if (profileKey && typeof profileKey === "string" && profileKey.trim()) {
+    return profileKey.trim();
   }
 
   const envKey =

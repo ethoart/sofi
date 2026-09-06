@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { 
-  X, Settings, Zap, Cpu, Sparkles, CheckCircle2, Shield, Check, Key, ExternalLink, Eye, EyeOff
+  X, Settings, Zap, Cpu, Sparkles, CheckCircle2, Shield, Check, Key, ExternalLink, Eye, EyeOff,
+  Loader2, AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile } from "../types";
@@ -33,6 +34,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   });
   const [showKey, setShowKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   React.useEffect(() => {
     if (userProfile?.preferences?.agentRouterKey) {
@@ -41,20 +44,73 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [userProfile?.preferences?.agentRouterKey]);
 
   const handleSaveKey = async () => {
+    const key = agentRouterKey.trim();
     if (typeof window !== "undefined") {
-      localStorage.setItem("sofi_agentrouter_key", agentRouterKey.trim());
+      localStorage.setItem("sofi_agentrouter_key", key);
     }
+    
+    // Sync key to server runtime environment immediately
+    if (key) {
+      fetch("/api/config/agentrouter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key })
+      }).catch(() => {});
+    }
+
     if (userProfile && onSaveUserProfile) {
       await onSaveUserProfile({
         ...userProfile,
         preferences: {
           ...userProfile.preferences,
-          agentRouterKey: agentRouterKey.trim()
+          agentRouterKey: key
         }
       });
     }
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
+  };
+
+  const handleTestKey = async () => {
+    const keyToTest = agentRouterKey.trim();
+    if (!keyToTest) return;
+    setIsTesting(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/agentrouter/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: keyToTest })
+      });
+      const data = await res.json();
+      setTestResult({
+        success: !!data.success,
+        message: data.message || (data.success ? "Key verified! Connected to AgentRouter." : "Verification failed.")
+      });
+
+      if (data.success) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("sofi_agentrouter_key", keyToTest);
+        }
+        if (userProfile && onSaveUserProfile) {
+          onSaveUserProfile({
+            ...userProfile,
+            preferences: {
+              ...userProfile.preferences,
+              agentRouterKey: keyToTest
+            }
+          }).catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err?.message || "Failed to reach server to test key."
+      });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -301,7 +357,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <input
                     type={showKey ? "text" : "password"}
                     value={agentRouterKey}
-                    onChange={(e) => setAgentRouterKey(e.target.value)}
+                    onChange={(e) => {
+                      setAgentRouterKey(e.target.value);
+                      setTestResult(null);
+                    }}
                     placeholder="sk-ar-... (AgentRouter API Key)"
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#FF6A3D]"
                   />
@@ -316,8 +375,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <button
                   type="button"
+                  onClick={handleTestKey}
+                  disabled={isTesting || !agentRouterKey.trim()}
+                  className="px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF6A3D]" /> : <Zap className="w-3.5 h-3.5 text-[#FF6A3D]" />}
+                  <span>{isTesting ? "Testing..." : "Test Key"}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleSaveKey}
-                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 ${
+                  disabled={!agentRouterKey.trim()}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
                     isSaved
                       ? "bg-emerald-500 text-black shadow-md"
                       : "bg-[#FF6A3D] hover:bg-[#FF8A50] text-white shadow-md shadow-orange-500/20"
@@ -327,6 +397,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>{isSaved ? "Saved!" : "Save Key"}</span>
                 </button>
               </div>
+
+              {/* Test Result Feedback */}
+              {testResult && (
+                <div className={`p-2.5 rounded-xl text-xs flex items-start gap-2 border ${
+                  testResult.success
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                    : "bg-red-500/10 border-red-500/30 text-red-300"
+                }`}>
+                  {testResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                  )}
+                  <div className="flex-1 leading-snug">
+                    <span className="font-bold">{testResult.success ? "Connection Verified: " : "Connection Error: "}</span>
+                    <span>{testResult.message}</span>
+                  </div>
+                </div>
+              )}
 
               {agentRouterKey ? (
                 <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">

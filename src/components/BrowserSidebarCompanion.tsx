@@ -101,6 +101,7 @@ export const BrowserSidebarCompanion: React.FC<BrowserSidebarCompanionProps> = (
     setIsLoading(true);
 
     try {
+      const storedKey = typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "";
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,7 +109,8 @@ export const BrowserSidebarCompanion: React.FC<BrowserSidebarCompanionProps> = (
           message: prompt,
           selectedModel: "auto",
           language,
-          mode: "general"
+          mode: "general",
+          agentRouterKey: storedKey
         })
       });
 

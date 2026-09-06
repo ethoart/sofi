@@ -459,7 +459,79 @@ app.post("/api/profile/user", (req, res) => {
     updatedAt: new Date().toISOString()
   };
   writeJsonSafe(USER_PROFILE_FILE, updated);
+  if (updated.preferences?.agentRouterKey && typeof updated.preferences.agentRouterKey === "string" && updated.preferences.agentRouterKey.trim()) {
+    process.env.AGENTROUTER_API_KEY = updated.preferences.agentRouterKey.trim();
+  }
   res.json({ success: true, profile: updated });
+});
+
+// Configure AgentRouter API Key directly
+app.post("/api/config/agentrouter", (req, res) => {
+  const { key } = req.body;
+  if (typeof key === "string" && key.trim()) {
+    const trimmed = key.trim();
+    process.env.AGENTROUTER_API_KEY = trimmed;
+    const profile = readJsonSafe(USER_PROFILE_FILE, initUserProfile());
+    profile.preferences = {
+      ...(profile.preferences || {}),
+      agentRouterKey: trimmed
+    };
+    writeJsonSafe(USER_PROFILE_FILE, profile);
+    return res.json({ success: true, message: "AgentRouter API key saved and activated!" });
+  }
+  res.status(400).json({ error: "Invalid key provided" });
+});
+
+// Verify AgentRouter API Key live with the gateway
+app.post("/api/agentrouter/verify", async (req, res) => {
+  const key = (req.body.key && typeof req.body.key === "string" && req.body.key.trim())
+    ? req.body.key.trim()
+    : process.env.AGENTROUTER_API_KEY;
+
+  if (!key) {
+    return res.status(400).json({ success: false, message: "No API key provided to test." });
+  }
+
+  try {
+    const testRes = await fetch("https://co.agentrouter.org/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o",
+        messages: [{ role: "user", content: "hi" }]
+      })
+    });
+
+    const responseText = await testRes.text();
+    if (testRes.ok) {
+      process.env.AGENTROUTER_API_KEY = key;
+      const profile = readJsonSafe(USER_PROFILE_FILE, initUserProfile());
+      profile.preferences = {
+        ...(profile.preferences || {}),
+        agentRouterKey: key
+      };
+      writeJsonSafe(USER_PROFILE_FILE, profile);
+      return res.json({ success: true, message: "Key verified and connected successfully!" });
+    }
+
+    let parsedMsg = responseText.slice(0, 200);
+    try {
+      const json = JSON.parse(responseText);
+      if (json.msg) parsedMsg = json.msg;
+      else if (json.error?.message) parsedMsg = json.error.message;
+    } catch (_) {}
+
+    return res.json({
+      success: false,
+      status: testRes.status,
+      message: parsedMsg || `HTTP ${testRes.status} error from AgentRouter.`
+    });
+  } catch (err: any) {
+    return res.json({ success: false, message: err?.message || "Could not reach AgentRouter gateway." });
+  }
 });
 
 // 2. Sofi Profile
@@ -866,7 +938,18 @@ app.post("/api/extension/build", async (req, res) => {
 // ==================== SOFI AI CHAT WITH INTERNAL SLM & MEMORY ====================
 
 app.post("/api/chat", async (req, res) => {
-  const { message, history, language, mode, edition, selectedModel, attachments, forceWebSearch } = req.body;
+  const { 
+    message, 
+    history, 
+    language, 
+    mode, 
+    edition, 
+    selectedModel, 
+    attachments, 
+    forceWebSearch,
+    agentRouterKey: clientAgentRouterKey,
+    userProfile: clientUserProfile
+  } = req.body;
   const currentLang = language === "si" ? "si" : "en";
   const userMsg = (message || "").toLowerCase().trim();
   const currentMode = mode || "general";
@@ -924,7 +1007,26 @@ app.post("/api/chat", async (req, res) => {
     modeDirective +
     (matchedSkillResult ? `\n\n[NOTICE]: You just executed the learned tool/skill "${triggeredSkillName}" on the server. Output:\n${matchedSkillResult}\nAcknowledge this execution naturally to the user.` : "");
 
-  const userProfile = readJsonSafe(USER_PROFILE_FILE, { name: "User", nickname: "Friend" });
+  const diskUserProfile = readJsonSafe<any>(USER_PROFILE_FILE, initUserProfile());
+  const activeUserProfile: any = {
+    ...diskUserProfile,
+    ...(clientUserProfile || {}),
+    preferences: {
+      ...(diskUserProfile?.preferences || {}),
+      ...(clientUserProfile?.preferences || {})
+    }
+  };
+
+  const resolvedAgentRouterKey = 
+    (typeof clientAgentRouterKey === "string" && clientAgentRouterKey.trim()) ||
+    (typeof activeUserProfile?.preferences?.agentRouterKey === "string" && activeUserProfile.preferences.agentRouterKey.trim()) ||
+    (diskUserProfile?.preferences?.agentRouterKey as string | undefined) ||
+    process.env.AGENTROUTER_API_KEY;
+
+  if (resolvedAgentRouterKey && resolvedAgentRouterKey.startsWith("sk-")) {
+    process.env.AGENTROUTER_API_KEY = resolvedAgentRouterKey;
+  }
+
   const allMemories = readJsonSafe(MEMORIES_FILE, []);
   const allVocab = readJsonSafe(VOCAB_FILE, []);
 
@@ -938,11 +1040,12 @@ app.post("/api/chat", async (req, res) => {
     selectedModel: selectedModel || "auto",
     attachments,
     systemPrompt,
-    userProfile,
+    userProfile: activeUserProfile,
+    agentRouterKey: resolvedAgentRouterKey,
     memories: allMemories,
     vocab: allVocab,
     forceWebSearch: !!forceWebSearch
-  });
+  } as any);
 
   res.json({
     reply: routerResult.reply,

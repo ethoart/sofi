@@ -240,6 +240,7 @@ export const SofiChat: React.FC<SofiChatProps> = ({
     setIsTyping(true);
 
     try {
+      const storedKey = typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "";
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -248,7 +249,8 @@ export const SofiChat: React.FC<SofiChatProps> = ({
         body: JSON.stringify({
           message: text,
           history: messages.slice(-10), // send last 10 messages context
-          language
+          language,
+          agentRouterKey: storedKey
         })
       });
 

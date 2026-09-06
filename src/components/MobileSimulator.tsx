@@ -201,12 +201,14 @@ export const MobileSimulator: React.FC<MobileSimulatorProps> = ({
 
   const runCapturedCommand = async (command: string) => {
     try {
+      const storedKey = typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "";
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: command,
-          language
+          language,
+          agentRouterKey: storedKey
         })
       });
 
