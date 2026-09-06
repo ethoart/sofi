@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -214,6 +217,21 @@ app.get("/api/auth/smtp-status", (req, res) => {
   res.json({
     success: true,
     smtp: getSmtpStatus()
+  });
+});
+
+app.post("/api/auth/test-smtp", async (req, res) => {
+  const { testEmail } = req.body;
+  const target = testEmail || process.env.SMTP_USER;
+  if (!target) {
+    return res.status(400).json({ success: false, error: "Please provide testEmail or configure SMTP_USER in .env" });
+  }
+  const testCode = generateVerificationCode();
+  const result = await sendVerificationEmail(target, "Admin / Tester", testCode);
+  res.json({
+    success: result.success,
+    result,
+    smtpConfig: getSmtpStatus()
   });
 });
 

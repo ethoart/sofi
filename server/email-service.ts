@@ -50,12 +50,16 @@ export async function sendVerificationEmail(
   nameOrUsername: string,
   code: string
 ): Promise<SendEmailResult> {
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const host = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
   const port = parseInt(process.env.SMTP_PORT || "587", 10);
   const secure = process.env.SMTP_SECURE === "true" || port === 465;
   const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
-  const from = process.env.SMTP_FROM || `"Sofi AI" <${user || "noreply@sofi.ai"}>`;
+  // Strip whitespace from Gmail app passwords if user pasted with spaces
+  let pass = process.env.SMTP_PASS?.trim();
+  if (pass && host.includes("gmail") && pass.includes(" ")) {
+    pass = pass.replace(/\s+/g, "");
+  }
+  const from = process.env.SMTP_FROM || `"Sofi AI" <${user || "noreply@dewmanthi.site"}>`;
 
   // If SMTP credentials are NOT configured in .env, provide simulated verification
   if (!user || !pass) {
@@ -73,7 +77,8 @@ export async function sendVerificationEmail(
   }
 
   try {
-    const transporter = nodemailer.createTransport({
+    const isGmail = host.toLowerCase().includes("gmail");
+    const transportOptions: any = {
       host,
       port,
       secure,
@@ -83,8 +88,17 @@ export async function sendVerificationEmail(
       },
       tls: {
         rejectUnauthorized: false
-      }
-    });
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
+    };
+
+    if (isGmail && port === 587) {
+      transportOptions.requireTLS = true;
+    }
+
+    const transporter = nodemailer.createTransport(transportOptions);
 
     const htmlContent = `
 <!DOCTYPE html>
