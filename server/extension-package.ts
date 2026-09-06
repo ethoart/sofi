@@ -1,9 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { createRequire } from "module";
+import * as archiverPkg from "archiver";
 
-const require = createRequire(import.meta.url);
-const archiver = require("archiver");
+const archiver = (archiverPkg as any).default || archiverPkg;
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const EXTENSION_DIR = path.join(DATA_DIR, "sofi-browser-extension");
