@@ -587,6 +587,57 @@ export function generateSofiLbgmResponse(
   const isSi = language === "si";
   const nick = userProfile?.nickname || "Friend";
   const primaryMemory = memories && memories.length > 0 ? memories[0].summary : "your personalized workspace";
+  const msgLower = (message || "").toLowerCase().trim();
+
+  // Clean prompt of assistant name/wake words
+  const cleanMsg = msgLower
+    .replace(/^(\s*[@#\/\!]?\s*(?:hey\s+)?sofi\b[,\s:\-]*)+/i, "")
+    .replace(/\b(?:hey\s+)?sofi\b/gi, "")
+    .trim();
+
+  // 0. Live Date & Time Resolution
+  if (
+    cleanMsg === "what is today" ||
+    cleanMsg === "what day is today" ||
+    cleanMsg === "what's today" ||
+    cleanMsg === "today" ||
+    cleanMsg.includes("what is today") ||
+    cleanMsg.includes("what is today's date") ||
+    cleanMsg.includes("what's today's date") ||
+    cleanMsg.includes("what date is today") ||
+    cleanMsg.includes("current date") ||
+    cleanMsg.includes("current time") ||
+    cleanMsg.includes("what time is it") ||
+    cleanMsg.includes("ada dinaya") ||
+    cleanMsg.includes("ada davasa")
+  ) {
+    const now = new Date();
+    const dayNamesEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const dayNamesSi = ["ඉරිදා", "සඳුදා", "අඟහරුවාදා", "බදාදා", "බ්‍රහස්පතින්දා", "සිකුරාදා", "සෙනසුරාදා"];
+    const monthNamesSi = ["ජනවාරි", "පෙබරවාරි", "මාර්තු", "අප්‍රේල්", "මැයි", "ජූනි", "ජූලි", "අගෝස්තු", "සැප්තැම්බර්", "ඔක්තෝබර්", "නොවැම්බර්", "දෙසැම්බර්"];
+
+    const dayNameEn = dayNamesEn[now.getUTCDay()];
+    const monthNameEn = monthNamesEn[now.getUTCMonth()];
+    const dateNum = now.getUTCDate();
+    const year = now.getUTCFullYear();
+    const timeStrUtc = now.toTimeString().split(" ")[0];
+
+    const dayNameSi = dayNamesSi[now.getUTCDay()];
+    const monthNameSi = monthNamesSi[now.getUTCMonth()];
+
+    if (isSi) {
+      return `📅 **අද දිනය:** **${year} ${monthNameSi} ${dateNum} (${dayNameSi})**
+⏰ **වේලාව:** ${timeStrUtc} (UTC)
+
+ආයුබෝවන් ${nick}! අද දිනට නියමිත වැඩසටහන් හෝ කාර්යයන් සඳහා ඔබට සහාය වීමට මම සූදානම්.`;
+    } else {
+      return `📅 **Today is ${dayNameEn}, ${monthNameEn} ${dateNum}, ${year}**
+⏰ **Current UTC Time:** ${timeStrUtc}
+
+Hello ${nick}! How can I assist you with your schedule or tasks today?`;
+    }
+  }
 
   // Check if attachments were passed
   const docNames = input.attachments?.filter((a) => a.type === "document").map((a) => a.name).join(", ");
@@ -721,13 +772,116 @@ I'm actively referencing your stored preferences (including "${primaryMemory}") 
 }
 
 /**
+ * Parse inline model trigger prefixes like:
+ * "gpt make a website", "chatgpt build a portfolio", "claude write a poem",
+ * "deepseek write an algorithm", "opus synthesize this theory", "glm translate this",
+ * "@gpt ...", "@claude ...", "@deepseek ...", "/gpt ...", "/claude ...", "gpt: ..."
+ */
+export interface PromptPrefixResult {
+  targetModel:
+    | "claude-3-5-sonnet"
+    | "claude-opus-4-8"
+    | "claude-opus-5"
+    | "deepseek-v4-flash"
+    | "glm-5.3"
+    | "gpt-5.6-sol"
+    | "gpt-4o";
+  targetLabel: string;
+  cleanedMessage: string;
+  prefixUsed: string;
+}
+
+export function parseModelPrefixFromPrompt(message: string): PromptPrefixResult | null {
+  if (!message || typeof message !== "string") return null;
+  const trimmed = message.trim();
+
+  const prefixRegex = /^([/@#]?)(\b(?:chatgpt|gpt[-_]?4o|gpt[-_]?5(?:\.6)?|gpt|claude[-_]?opus[-_]?5|claude[-_]?opus[-_]?4\.8|claude[-_]?opus|claude[-_]?3\.5|claude|deepseek[-_]?v4|deepseek|glm[-_]?5\.3|glm|opus[-_]?5|opus[-_]?4\.8|opus|sol)\b)[:,\s\-]+(.*)$/i;
+
+  const match = trimmed.match(prefixRegex);
+  if (!match) return null;
+
+  const rawTrigger = match[2].toLowerCase().replace(/[-_.]/g, "");
+  const remainingText = match[3].trim();
+  const cleanedMessage = remainingText.length > 0 ? remainingText : trimmed;
+
+  if (rawTrigger.includes("deepseek")) {
+    return {
+      targetModel: "deepseek-v4-flash",
+      targetLabel: "DeepSeek v4 Flash",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  if (rawTrigger.includes("opus5") || rawTrigger === "opus" || rawTrigger === "claudeopus5" || rawTrigger === "claudeopus") {
+    return {
+      targetModel: "claude-opus-5",
+      targetLabel: "Claude Opus 5",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  if (rawTrigger.includes("opus4") || rawTrigger === "claudeopus48") {
+    return {
+      targetModel: "claude-opus-4-8",
+      targetLabel: "Claude Opus 4.8",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  if (rawTrigger.includes("claude")) {
+    return {
+      targetModel: "claude-3-5-sonnet",
+      targetLabel: "Claude 3.5 Sonnet",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  if (rawTrigger.includes("gpt5") || rawTrigger === "sol" || rawTrigger === "gpt56") {
+    return {
+      targetModel: "gpt-5.6-sol",
+      targetLabel: "GPT-5.6 Sol",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  if (rawTrigger.includes("gpt") || rawTrigger.includes("chatgpt")) {
+    return {
+      targetModel: "gpt-4o",
+      targetLabel: "ChatGPT (GPT-4o)",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  if (rawTrigger.includes("glm")) {
+    return {
+      targetModel: "glm-5.3",
+      targetLabel: "GLM 5.3",
+      cleanedMessage,
+      prefixUsed: match[2]
+    };
+  }
+
+  return null;
+}
+
+/**
  * Main Multi-Model Dispatcher
  */
 export async function dispatchMultiModelPrompt(input: RouterInput): Promise<RouterOutput> {
   const { message, selectedModel = "auto", mode = "general", attachments } = input;
 
+  // Check if user specified a model trigger prefix in prompt (e.g. "gpt make website", "deepseek ...", "claude ...")
+  const prefixMatch = parseModelPrefixFromPrompt(message);
+  const effectiveMessage = prefixMatch ? prefixMatch.cleanedMessage : message;
+
   // Pre-process attachments into message context if document text exists
-  let enrichedMessage = message;
+  let enrichedMessage = effectiveMessage;
   const docAttachments = (attachments || []).filter((a) => a.type === "document");
   if (docAttachments.length > 0) {
     const docSummaries = docAttachments
@@ -771,7 +925,11 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
   let targetLabel: string;
   let routingReason: string;
 
-  if (selectedModel === "claude-opus-4-8") {
+  if (prefixMatch) {
+    targetModel = prefixMatch.targetModel;
+    targetLabel = prefixMatch.targetLabel;
+    routingReason = `Prompt Command "${prefixMatch.prefixUsed}" → Directly dispatched to ${prefixMatch.targetLabel} via https://agentrouter.org`;
+  } else if (selectedModel === "claude-opus-4-8") {
     targetModel = "claude-opus-4-8";
     targetLabel = "Claude Opus 4.8";
     routingReason = "User Selected: Claude Opus 4.8 (via https://agentrouter.org)";
@@ -779,15 +937,15 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     targetModel = "claude-opus-5";
     targetLabel = "Claude Opus 5";
     routingReason = "User Selected: Claude Opus 5 (via https://agentrouter.org)";
-  } else if (selectedModel === "deepseek-v4-flash") {
+  } else if (selectedModel === "deepseek-v4-flash" || selectedModel === ("deepseek" as any)) {
     targetModel = "deepseek-v4-flash";
     targetLabel = "DeepSeek v4 Flash";
     routingReason = "User Selected: DeepSeek v4 Flash (via https://agentrouter.org)";
-  } else if (selectedModel === "glm-5.3") {
+  } else if (selectedModel === "glm-5.3" || selectedModel === ("glm" as any)) {
     targetModel = "glm-5.3";
     targetLabel = "GLM 5.3";
     routingReason = "User Selected: GLM 5.3 (via https://agentrouter.org)";
-  } else if (selectedModel === "gpt-5.6-sol") {
+  } else if (selectedModel === "gpt-5.6-sol" || selectedModel === ("gpt-5" as any)) {
     targetModel = "gpt-5.6-sol";
     targetLabel = "GPT-5.6 Sol";
     routingReason = "User Selected: GPT-5.6 Sol (via https://agentrouter.org)";
@@ -795,7 +953,7 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     targetModel = "claude-3-5-sonnet";
     targetLabel = "Claude 3.5 Sonnet";
     routingReason = "User Selected: Claude 3.5 Sonnet (via https://agentrouter.org)";
-  } else if (selectedModel === "chatgpt") {
+  } else if (selectedModel === "chatgpt" || selectedModel === ("gpt" as any)) {
     targetModel = "gpt-4o";
     targetLabel = "ChatGPT (GPT-4o)";
     routingReason = "User Selected: ChatGPT (GPT-4o via https://agentrouter.org)";

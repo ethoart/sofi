@@ -167,7 +167,75 @@ function synthesizeLbgmAutonomousResponse(
   const primaryMemory = memories && memories.length > 0 ? memories[0].summary : "your personalized workspace";
   const msgLower = (message || "").toLowerCase().trim();
 
-  // 0. Direct Knowledge Dictionary for instant, accurate answers in SLM / Local mode
+  // Clean prompt of assistant name/wake words
+  const cleanMsg = msgLower
+    .replace(/^(\s*[@#\/\!]?\s*(?:hey\s+)?sofi\b[,\s:\-]*)+/i, "")
+    .replace(/\b(?:hey\s+)?sofi\b/gi, "")
+    .trim();
+
+  // 1. Live Date, Day, and Time resolution
+  if (
+    cleanMsg === "what is today" ||
+    cleanMsg === "what day is today" ||
+    cleanMsg === "what's today" ||
+    cleanMsg === "today" ||
+    cleanMsg.includes("what is today") ||
+    cleanMsg.includes("what is today's date") ||
+    cleanMsg.includes("what's today's date") ||
+    cleanMsg.includes("what date is today") ||
+    cleanMsg.includes("current date") ||
+    cleanMsg.includes("current time") ||
+    cleanMsg.includes("what time is it") ||
+    cleanMsg.includes("ada dinaya") ||
+    cleanMsg.includes("ada davasa")
+  ) {
+    const now = new Date();
+    const dayNamesEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const dayNamesSi = ["ඉරිදා", "සඳුදා", "අඟහරුවාදා", "බදාදා", "බ්‍රහස්පතින්දා", "සිකුරාදා", "සෙනසුරාදා"];
+    const monthNamesSi = ["ජනවාරි", "පෙබරවාරි", "මාර්තු", "අප්‍රේල්", "මැයි", "ජූනි", "ජූලි", "අගෝස්තු", "සැප්තැම්බර්", "ඔක්තෝබර්", "නොවැම්බර්", "දෙසැම්බර්"];
+
+    const dayNameEn = dayNamesEn[now.getUTCDay()];
+    const monthNameEn = monthNamesEn[now.getUTCMonth()];
+    const dateNum = now.getUTCDate();
+    const year = now.getUTCFullYear();
+    const timeStrUtc = now.toTimeString().split(" ")[0];
+
+    const dayNameSi = dayNamesSi[now.getUTCDay()];
+    const monthNameSi = monthNamesSi[now.getUTCMonth()];
+
+    if (isSi) {
+      return `📅 **අද දිනය:** **${year} ${monthNameSi} ${dateNum} (${dayNameSi})**
+⏰ **වේලාව:** ${timeStrUtc} (UTC)
+
+ආයුබෝවන් ${nick}! අද දිනට නියමිත වැඩසටහන් හෝ කාර්යයන් සඳහා ඔබට සහාය වීමට මම සූදානම්.`;
+    } else {
+      return `📅 **Today is ${dayNameEn}, ${monthNameEn} ${dateNum}, ${year}**
+⏰ **Current UTC Time:** ${timeStrUtc}
+
+Hello ${nick}! How can I assist you with your schedule or tasks today?`;
+    }
+  }
+
+  // 2. Greetings and Conversational check
+  if (/^(hi|hello|hey|greetings|good\s+morning|good\s+afternoon|good\s+evening|good\s+night|ayubowan|kohomada)$/i.test(cleanMsg)) {
+    if (isSi) {
+      return `ආයුබෝවන් ${nick}! මම සොෆී (Sofi). ඔබව නැවත හමුවීම සතුටක්. අද ඔබට උදව් කළ හැක්කේ කෙසේද?`;
+    } else {
+      return `Hello ${nick}! I am Sofi, your AI companion. It's wonderful to hear from you. How can I help you today?`;
+    }
+  }
+
+  // 3. Identity and Who are you questions
+  if (/^(who\s+are\s+you|what\s+is\s+your\s+name|tell\s+me\s+about\s+yourself|who\s+made\s+you)$/i.test(cleanMsg)) {
+    if (isSi) {
+      return `මම **සොෆී (Sofi)** — ඔබට සහාය වන ද්විභාෂා කෘතිම බුද්ධි සහායිකාවයි. මට කේත ලිවීම, ගැඹුරු පර්යේෂණ කිරීම, සහ තොරතුරු සෙවීම ආදී බොහෝ දේ කළ හැකිය.`;
+    } else {
+      return `I am **Sofi**, your intelligent AI assistant powered by high-efficiency local SLM cognitive models and frontier AI capabilities. I can assist with software engineering, research, voice interaction, and task orchestration!`;
+    }
+  }
+
+  // 4. Direct Knowledge Dictionary for instant, accurate answers in SLM / Local mode
   const knowledgeMap: Record<string, { en: string; si: string }> = {
     xmr: {
       en: `**XMR (Monero)** is an open-source, privacy-centric cryptocurrency launched in April 2014.

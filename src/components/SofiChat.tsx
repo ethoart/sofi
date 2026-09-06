@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  Mic, MicOff, Send, Volume2, VolumeX, Sparkles, Languages, HelpCircle, RefreshCw, Server
+  Mic, MicOff, Send, Volume2, VolumeX, Sparkles, Languages, HelpCircle, RefreshCw, Server, Copy, Check
 } from "lucide-react";
 import { Message, Skill } from "../types";
 import { motion, AnimatePresence } from "motion/react";
@@ -40,6 +40,13 @@ export const SofiChat: React.FC<SofiChatProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const handleCopyText = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMessageId(id);
+    setTimeout(() => setCopiedMessageId(null), 2200);
+  };
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -421,11 +428,31 @@ export const SofiChat: React.FC<SofiChatProps> = ({
                   </div>
                 )}
 
-                <span className={`text-[9px] block mt-2 text-right leading-none ${
-                  msg.sender === "user" ? "text-orange-200" : "text-amber-200/40"
-                }`}>
-                  {msg.timestamp}
-                </span>
+                <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(msg.id, msg.text)}
+                    className="flex items-center gap-1 text-[10px] text-amber-200/70 hover:text-white transition cursor-pointer p-0.5 rounded hover:bg-white/10"
+                    title="Copy text"
+                  >
+                    {copiedMessageId === msg.id ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[10px] text-emerald-400 font-bold">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                  <span className={`text-[9px] leading-none ${
+                    msg.sender === "user" ? "text-orange-200" : "text-amber-200/40"
+                  }`}>
+                    {msg.timestamp}
+                  </span>
+                </div>
               </div>
             </motion.div>
           ))}

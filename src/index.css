@@ -7,7 +7,20 @@
     color: #F8ECE8;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    user-select: text;
+    -webkit-user-select: text;
   }
+}
+
+/* Ensure smooth text copying and selection across all messages and components */
+::selection {
+  background-color: rgba(255, 106, 61, 0.35);
+  color: #FFFFFF;
+}
+
+button, [role="button"], input[type="file"] {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Custom sleek scrollbars matching the bento dark cocoa theme */

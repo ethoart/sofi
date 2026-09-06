@@ -65,8 +65,22 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     localStorage.setItem("sofi_edition", edition);
   };
 
-  // Multi-Model Routing (Fully automated server-side intelligence)
-  const selectedModel: SupportedAiModel = "auto";
+  // Multi-Model Routing (User selectable & auto server-side intelligence)
+  const [selectedModel, setSelectedModel] = useState<SupportedAiModel>("auto");
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [copiedCodeKey, setCopiedCodeKey] = useState<string | null>(null);
+
+  const handleCopyMessageText = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMessageId(id);
+    setTimeout(() => setCopiedMessageId(null), 2200);
+  };
+
+  const handleCopyCodeText = (key: string, code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCodeKey(key);
+    setTimeout(() => setCopiedCodeKey(null), 2200);
+  };
 
   // Document & Photo Upload State
   const [stagedAttachments, setStagedAttachments] = useState<Attachment[]>([]);
@@ -700,38 +714,51 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     if (text.includes("```")) {
       const parts = text.split(/(```[\s\S]*?```)/g);
       return (
-        <div className="space-y-2">
+        <div className="space-y-2 select-text">
           {parts.map((part, i) => {
             if (part.startsWith("```")) {
               const lines = part.slice(3, -3).trim().split("\n");
               const lang = lines[0].trim();
               const code = lines.slice(1).join("\n");
+              const codeKey = `code-${i}-${part.slice(0, 20)}`;
+              const isCopied = copiedCodeKey === codeKey;
+
               return (
-                <div key={i} className="my-2 rounded-2xl bg-[#0B0504] border border-white/10 overflow-hidden text-xs">
+                <div key={i} className="my-2 rounded-2xl bg-[#0B0504] border border-white/10 overflow-hidden text-xs select-text">
                   <div className="flex items-center justify-between px-3 py-1.5 bg-[#160B09] border-b border-white/5 font-mono text-[10px] text-amber-200/60">
-                    <span>{lang || "code"}</span>
+                    <span className="font-semibold text-amber-300/80">{lang || "code"}</span>
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard.writeText(code)}
-                      className="hover:text-white flex items-center gap-1 cursor-pointer"
+                      onClick={() => handleCopyCodeText(codeKey, code || lines.join("\n"))}
+                      className="hover:text-white flex items-center gap-1 cursor-pointer transition text-amber-200/80"
+                      title="Copy code to clipboard"
                     >
-                      <Copy className="w-3 h-3" />
-                      <span>Copy</span>
+                      {isCopied ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400 font-bold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
                     </button>
                   </div>
-                  <pre className="p-3 overflow-x-auto text-emerald-300 font-mono text-[11px] leading-relaxed">
+                  <pre className="p-3 overflow-x-auto text-emerald-300 font-mono text-[11px] leading-relaxed select-text">
                     <code>{code || lines.join("\n")}</code>
                   </pre>
                 </div>
               );
             }
-            return <div key={i} className="whitespace-pre-wrap">{part}</div>;
+            return <div key={i} className="whitespace-pre-wrap select-text">{part}</div>;
           })}
         </div>
       );
     }
 
-    return <div className="whitespace-pre-wrap">{text}</div>;
+    return <div className="whitespace-pre-wrap select-text">{text}</div>;
   };
 
   return (
@@ -1094,17 +1121,38 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between gap-4 text-[10px] opacity-60 pt-1">
-                  <span>{msg.timestamp}</span>
-                  {msg.sender === "sofi" && (
+                <div className="flex items-center justify-between gap-4 text-[10px] opacity-70 pt-1 border-t border-white/5">
+                  <span className="font-mono">{msg.timestamp}</span>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => speakText(msg.text)}
-                      className="hover:opacity-100 transition cursor-pointer p-0.5"
-                      title="Speak out loud"
+                      type="button"
+                      onClick={() => handleCopyMessageText(msg.id, msg.text)}
+                      className="hover:opacity-100 transition cursor-pointer p-1 rounded-lg hover:bg-white/10 flex items-center gap-1 text-amber-200/80 hover:text-white"
+                      title="Copy full text to clipboard"
                     >
-                      <Volume2 className="w-3.5 h-3.5" />
+                      {copiedMessageId === msg.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-[10px] text-emerald-400 font-bold">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span className="text-[10px] hidden sm:inline">Copy</span>
+                        </>
+                      )}
                     </button>
-                  )}
+                    {msg.sender === "sofi" && (
+                      <button
+                        type="button"
+                        onClick={() => speakText(msg.text)}
+                        className="hover:opacity-100 transition cursor-pointer p-1 rounded-lg hover:bg-white/10 flex items-center gap-1 text-amber-200/80 hover:text-white"
+                        title="Speak out loud"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1211,6 +1259,41 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 )}
               </button>
             </div>
+
+            {/* Pro Frontier Model Selection Strip (User Choice + Prompt Command Supported) */}
+            {sofiEdition === "pro" && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 px-0.5 no-scrollbar">
+                <span className="text-[10px] font-mono text-amber-200/50 shrink-0 font-bold uppercase tracking-wider mr-1">
+                  Pro Model:
+                </span>
+                {[
+                  { id: "auto", label: "⚡ Auto Router", shortcut: "auto" },
+                  { id: "chatgpt", label: "💡 ChatGPT (GPT-4o)", shortcut: "gpt" },
+                  { id: "claude", label: "🧠 Claude 3.5 Sonnet", shortcut: "claude" },
+                  { id: "deepseek-v4-flash", label: "🚀 DeepSeek v4", shortcut: "deepseek" },
+                  { id: "claude-opus-5", label: "👑 Claude Opus 5", shortcut: "opus" },
+                  { id: "glm-5.3", label: "🌐 GLM 5.3", shortcut: "glm" },
+                  { id: "gpt-5.6-sol", label: "☀️ GPT-5.6 Sol", shortcut: "sol" }
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setSelectedModel(m.id as SupportedAiModel)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 border cursor-pointer ${
+                      selectedModel === m.id
+                        ? "bg-[#FF6A3D]/25 border-[#FF6A3D] text-white shadow-sm shadow-orange-500/20"
+                        : "bg-white/5 border-white/10 text-amber-200/60 hover:text-white hover:bg-white/10"
+                    }`}
+                    title={`Select ${m.label} or type "${m.shortcut} <prompt>" in input`}
+                  >
+                    <span>{m.label}</span>
+                    <span className="text-[9px] font-mono text-amber-200/40 bg-black/40 px-1 py-0.5 rounded">
+                      {m.shortcut}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Staged Attachments Preview Strip */}
             {stagedAttachments.length > 0 && (
@@ -1322,17 +1405,29 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   }
                 }}
                 placeholder={
-                  activeMode === "coding"
-                    ? "Ask coding or DevOps question (Claude 3.5 Sonnet active)..."
+                  selectedModel === "chatgpt"
+                    ? (language === "si" ? "ChatGPT (GPT-4o) වෙතින් අසන්න (උදා: 'gpt make website')..." : "Ask with ChatGPT (GPT-4o via AgentRouter)...")
+                    : selectedModel === "claude"
+                    ? (language === "si" ? "Claude 3.5 Sonnet වෙතින් අසන්න (උදා: 'claude write code')..." : "Ask with Claude 3.5 Sonnet (via AgentRouter)...")
+                    : selectedModel === "deepseek-v4-flash"
+                    ? (language === "si" ? "DeepSeek v4 Flash වෙතින් අසන්න (උදා: 'deepseek write api')..." : "Ask with DeepSeek v4 Flash (via AgentRouter)...")
+                    : selectedModel === "claude-opus-5"
+                    ? (language === "si" ? "Claude Opus 5 වෙතින් අසන්න (උදා: 'opus formulate theory')..." : "Ask with Claude Opus 5 (Frontier via AgentRouter)...")
+                    : selectedModel === "glm-5.3"
+                    ? (language === "si" ? "GLM 5.3 වෙතින් අසන්න (උදා: 'glm translate text')..." : "Ask with GLM 5.3 (via AgentRouter)...")
+                    : selectedModel === "gpt-5.6-sol"
+                    ? (language === "si" ? "GPT-5.6 Sol වෙතින් අසන්න (උදා: 'sol analyze system')..." : "Ask with GPT-5.6 Sol (via AgentRouter)...")
+                    : activeMode === "coding"
+                    ? (language === "si" ? "කේතනය හෝ DevOps අසන්න (උදා: 'gpt make website' හෝ 'deepseek ...')..." : "Ask coding question (try: 'gpt make website', 'deepseek ...', 'claude ...')...")
                     : activeMode === "research"
-                    ? "Enter deep research inquiry (GPT-4o active)..."
+                    ? (language === "si" ? "ගැඹුරු පර්යේෂණයක් අසන්න (උදා: 'opus ...' හෝ 'gpt ...')..." : "Enter research inquiry (try: 'opus ...', 'gpt ...', 'claude ...')...")
                     : stagedAttachments.length > 0
                     ? `Ask about ${stagedAttachments.length} attached document/photo...`
                     : activeMode === "creative"
                     ? "Describe image or video prompt, or click '+' to open studio..."
                     : language === "si"
-                    ? "සොෆීගෙන් ඕනෑම දෙයක් අසන්න හෝ ලේඛන/ඡායාරූප අමුණන්න..."
-                    : "Ask Sofi anything, upload documents/photos, or teach a memory..."
+                    ? "සොෆීගෙන් ඕනෑම දෙයක් අසන්න (උදා: 'gpt make website' හෝ 'claude ...')..."
+                    : "Ask Sofi anything (try: 'gpt make website', 'claude ...', 'deepseek ...')..."
                 }
                 className="flex-1 bg-transparent text-xs sm:text-sm text-white px-2 focus:outline-none placeholder:text-amber-200/30 font-medium"
               />

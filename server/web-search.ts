@@ -191,18 +191,36 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
 }
 
 /**
+ * Clean assistant wake words and conversational prefixes from search queries
+ */
+export function cleanAssistantWakeWords(query: string): string {
+  return query
+    .replace(/^(\s*[@#\/\!]?\s*(?:hey\s+)?sofi\b[,\s:\-]*)+/i, "")
+    .replace(/\b(?:hey\s+)?sofi\b/gi, "")
+    .replace(/^(?:search\s+the\s+web\s+for|search\s+for|look\s+up|please\s+research|research\s+on|tell\s+me\s+about|what\s+is|who\s+is|explain)\s+/i, "")
+    .trim();
+}
+
+/**
  * Determine if a user query requires live web search or research
  */
 export function isLiveSearchQuery(prompt: string, mode?: string): boolean {
   if (mode === "research") return true;
 
-  const clean = prompt.toLowerCase().trim();
+  const clean = cleanAssistantWakeWords(prompt).toLowerCase().trim();
   
   // Exclude single simple greetings or memory commands
-  if (/^(hi|hello|hey|ayubowan|kohomada|good\s+(morning|night)|thanks|sthuthiyi|bye)$/i.test(clean)) {
+  if (!clean || /^(hi|hello|hey|ayubowan|kohomada|good\s+(morning|afternoon|evening|night)|thanks|thank\s+you|sthuthiyi|bye|how\s+are\s+you)$/i.test(clean)) {
     return false;
   }
-  if (/^(who\s+are\s+you|what\s+is\s+your\s+name|what\s+do\s+you\s+remember)$/i.test(clean)) {
+  
+  // Exclude identity questions
+  if (/^(who\s+are\s+you|what\s+is\s+your\s+name|what\s+do\s+you\s+remember|tell\s+me\s+about\s+yourself|who\s+made\s+you)$/i.test(clean)) {
+    return false;
+  }
+
+  // Exclude Date & Time questions (handled directly by dynamic datetime engine)
+  if (/(what\s+is\s+today|what\s+day\s+is\s+today|what\s+is\s+the\s+date|what\s+time\s+is\s+it|what\s+is\s+today's\s+date|today's\s+date|current\s+time|current\s+date|ada\s+dinaya|ada\s+davasa|welawa)/i.test(clean)) {
     return false;
   }
 
@@ -211,13 +229,13 @@ export function isLiveSearchQuery(prompt: string, mode?: string): boolean {
     return true;
   }
 
-  // Time-sensitive queries
-  if (/(today|yesterday|tomorrow|this\s+week|this\s+year|2024|2025|2026|latest|breaking|score|price|status|current|newest)/i.test(clean)) {
+  // Time-sensitive queries (that are NOT simple date queries)
+  if (/(yesterday's\s+news|tomorrow's\s+schedule|this\s+week\s+news|this\s+year|2024|2025|2026|latest\s+news|breaking|score|current\s+price|newest)/i.test(clean)) {
     return true;
   }
 
-  // Any substantive question
-  if (clean.endsWith("?") || clean.length > 15) {
+  // Any substantive complex question with punctuation
+  if (clean.length > 25 && (clean.endsWith("?") || clean.includes("how") || clean.includes("why"))) {
     return true;
   }
 
@@ -228,9 +246,17 @@ export function isLiveSearchQuery(prompt: string, mode?: string): boolean {
  * Perform multi-source live web research for Sofi
  */
 export async function performLiveWebResearch(query: string): Promise<WebResearchReport> {
-  const cleanQuery = query
-    .replace(/^(search\s+the\s+web\s+for|search\s+for|look\s+up|please\s+research|research\s+on|tell\s+me\s+about|what\s+is|who\s+is|explain)\s+/i, "")
-    .trim();
+  const cleanQuery = cleanAssistantWakeWords(query);
+
+  if (!cleanQuery) {
+    return {
+      query,
+      summary: "",
+      results: [],
+      timestamp: new Date().toISOString(),
+      hasRealTimeData: false
+    };
+  }
 
   const [wikiResults, ddgResults] = await Promise.all([
     searchWikipedia(cleanQuery),
