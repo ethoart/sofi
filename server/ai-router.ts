@@ -277,8 +277,10 @@ async function callAgentRouter(
 
   // Supported AgentRouter gateway endpoints
   const routerEndpoints = [
+    "https://agentrouter.org/v1/chat/completions",
     "https://co.agentrouter.org/v1/chat/completions",
-    "https://agentrouter.org/v1/chat/completions"
+    "https://api.agentrouter.org/v1/chat/completions",
+    "https://agentrouter.to/v1/chat/completions"
   ];
 
   let lastError = "";
@@ -302,8 +304,14 @@ async function callAgentRouter(
         })
       });
 
+      const responseText = await res.text();
+      
+      // Check for explicit auth errors (401, 403)
+      if (res.status === 401 || res.status === 403) {
+        return { error: `HTTP ${res.status} Authorization Error from ${endpoint}: Please check if your AgentRouter API key is valid.` };
+      }
+
       if (res.ok) {
-        const responseText = await res.text();
         if (responseText.trim().startsWith("<")) {
           lastError = `Endpoint ${endpoint} returned an HTML page instead of JSON API response.`;
           console.warn(`[AgentRouter] ${lastError}`);
@@ -317,14 +325,15 @@ async function callAgentRouter(
           } else if (Array.isArray(content)) {
             const textBlock = content.find((c: any) => c.type === "text" || c.text);
             if (textBlock) return { text: (textBlock.text || textBlock.content || "").trim() };
+          } else if (data.error) {
+            return { error: `API Error from ${endpoint}: ${typeof data.error === 'string' ? data.error : JSON.stringify(data.error)}` };
           }
         } catch (parseErr) {
-          lastError = `Failed to parse JSON from ${endpoint}: ${parseErr}`;
+          lastError = `Failed to parse JSON from ${endpoint}: ${parseErr} (Response: ${responseText.slice(0, 150)})`;
           console.warn(`[AgentRouter] ${lastError}`);
         }
       } else {
-        const errText = await res.text().catch(() => "");
-        lastError = `HTTP ${res.status} from ${endpoint}: ${errText.slice(0, 300)}`;
+        lastError = `HTTP ${res.status} from ${endpoint}: ${responseText.slice(0, 300)}`;
         console.warn(`[AgentRouter] ${endpoint} for ${model} returned ${lastError}`);
       }
     } catch (e: any) {
