@@ -46,9 +46,9 @@ export function initUserProfile() {
       goals: ["Automate daily tasks with voice", "Build custom skills for AWS EC2", "Learn and teach language nuances"],
       preferences: {
         voiceSpeed: 1.0,
-        voicePitch: 1.0,
+        voicePitch: 1.15,
         formality: "balanced",
-        autoSpeak: true
+        autoSpeak: false
       },
       customInstructions: "Call me by my nickname when appropriate. Remind me of ongoing tasks and keep answers concise and helpful.",
       updatedAt: new Date().toISOString()

@@ -59,7 +59,13 @@ export async function sendVerificationEmail(
   if (pass && host.includes("gmail") && pass.includes(" ")) {
     pass = pass.replace(/\s+/g, "");
   }
-  const from = process.env.SMTP_FROM || `"Sofi AI" <${user || "noreply@dewmanthi.site"}>`;
+  const isGmail = host.toLowerCase().includes("gmail");
+  // If sending via Gmail SMTP, the From address MUST match the authenticated Gmail account
+  // unless a custom domain with Google Workspace is configured, otherwise it lands in Spam.
+  let from = process.env.SMTP_FROM?.trim();
+  if (!from || (isGmail && from.includes("@") && user && !from.includes(user))) {
+    from = `"Sofi AI" <${user}>`;
+  }
 
   // If SMTP credentials are NOT configured in .env, provide simulated verification
   if (!user || !pass) {
@@ -163,9 +169,16 @@ Sofi Autonomous AI Companion
     const info = await transporter.sendMail({
       from,
       to: email,
+      replyTo: user,
       subject: `Your Sofi AI Verification Code: ${code}`,
       text: textContent,
-      html: htmlContent
+      html: htmlContent,
+      headers: {
+        "X-Priority": "1",
+        "X-MSMail-Priority": "High",
+        "Importance": "high",
+        "X-Auto-Response-Suppress": "OOF, AutoReply"
+      }
     });
 
     console.log(`[SMTP] Verification email sent successfully to ${email}. MessageId: ${info.messageId}`);

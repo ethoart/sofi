@@ -165,20 +165,125 @@ function synthesizeLbgmAutonomousResponse(
   const isSi = language === "si";
   const nick = userProfile?.nickname || "Friend";
   const primaryMemory = memories && memories.length > 0 ? memories[0].summary : "your personalized workspace";
+  const msgLower = (message || "").toLowerCase().trim();
 
-  // Build Live Web Section if available
+  // 0. Direct Knowledge Dictionary for instant, accurate answers in SLM / Local mode
+  const knowledgeMap: Record<string, { en: string; si: string }> = {
+    xmr: {
+      en: `**XMR (Monero)** is an open-source, privacy-centric cryptocurrency launched in April 2014.
+
+### Key Highlights of Monero (XMR):
+• **Privacy by Default:** Unlike Bitcoin where wallet addresses and transaction amounts are visible on a public blockchain ledger, Monero encrypts transaction details.
+• **Core Cryptographic Technologies:**
+  - **Ring Signatures:** Hides the sender's identity by mixing multiple public keys.
+  - **Stealth Addresses:** Generates one-time random destination addresses for each transaction so recipients remain anonymous.
+  - **RingCT (Ring Confidential Transactions):** Obscures the transferred transaction amounts.
+• **Fungibility:** Every XMR coin is mutually interchangeable and cannot be blacklisted or tainted by previous transaction history.
+• **Proof-of-Work Algorithm:** Uses the **RandomX** algorithm, which is CPU-friendly and ASIC-resistant, allowing individuals to mine on standard computer hardware.`,
+      si: `**XMR (Monero)** යනු 2014 අප්‍රේල් මස දියත් කරන ලද, පුද්ගලිකත්වයට (Privacy) මුල්තැන දෙන විමධ්‍යගත ගුප්තකේතන මුදල් (Cryptocurrency) වර්ගයකි.
+
+### XMR (Monero) හි ප්‍රධාන ලක්ෂණ:
+• **ස්වයංක්‍රීය පුද්ගලිකත්වය (Privacy by Default):** Bitcoin හි සියලුම ගනුදෙනු හා මුදල් ප්‍රමාණයන් ඕනෑම අයෙකුට දැකගත හැකි නමුත්, Monero හි එවැනි තොරතුරු සම්පූර්ණයෙන්ම සඟවයි.
+• **ප්‍රධාන තාක්ෂණික ක්‍රම:**
+  - **Ring Signatures:** යවන්නාගේ අනන්‍යතාවය සඟවයි.
+  - **Stealth Addresses:** ලබන්නාගේ ලිපිනය සඟවමින් එක් එක් ගනුදෙනුවට වෙනම ලිපින සාදයි.
+  - **RingCT:** ගනුදෙනු කරන මුදල් ප්‍රමාණය සඟවයි.
+• **RandomX Algorithm:** සාමාන්‍ය පරිගණක ප්‍රොසෙසර් (CPU) මඟින් මයිනින් (Mining) කිරීමට හැකි වන පරිදි සකසා ඇත.`
+    },
+    monero: {
+      en: `**Monero (XMR)** is an open-source cryptocurrency built specifically to guarantee financial privacy and untraceability through Ring Signatures, Stealth Addresses, and RingCT. It was created in 2014 as a fork of Bytecoin (CryptoNote protocol).`,
+      si: `**Monero (XMR)** යනු ගනුදෙනුකරුවන්ගේ පුද්ගලිකත්වය හා රහස්‍යභාවය සුරකින ප්‍රමුඛතම Privacy Cryptocurrency එකකි.`
+    },
+    btc: {
+      en: `**Bitcoin (BTC)** is the first decentralized digital currency, introduced in 2008 by Satoshi Nakamoto. It uses a public Proof-of-Work blockchain to allow peer-to-peer value transfers without central intermediaries.`,
+      si: `**Bitcoin (BTC)** යනු 2008 දී සතෝෂි නකමොටෝ විසින් හඳුන්වා දුන් ලොව ප්‍රථම විමධ්‍යගත ඩිජිටල් මුදල් (Cryptocurrency) ක්‍රමයයි.`
+    },
+    eth: {
+      en: `**Ethereum (ETH)** is a decentralized global computing platform founded by Vitalik Buterin in 2015. It executes Smart Contracts and powers Decentralized Applications (dApps) and DeFi.`,
+      si: `**Ethereum (ETH)** යනු Smart Contracts සහ විමධ්‍යගත යෙදුම් (dApps) ක්‍රියාත්මක කිරීමට නිර්මාණය කරන ලද ප්‍රමුඛතම Blockchain වේදිකාවකි.`
+    },
+    sol: {
+      en: `**Solana (SOL)** is a high-performance Layer-1 blockchain capable of processing 65,000+ transactions per second using Proof-of-History (PoH) and Proof-of-Stake consensus.`,
+      si: `**Solana (SOL)** යනු වේගවත් ගනුදෙනු (High Throughput) සඳහා Proof-of-History තාක්ෂණය භාවිතා කරන ප්‍රමුඛ Blockchain එකකි.`
+    },
+    ai: {
+      en: `**Artificial Intelligence (AI)** refers to computer systems and algorithms capable of performing tasks that typically require human intelligence—such as reasoning, natural language comprehension, vision recognition, and autonomous decision making.`,
+      si: `**කෘතිම බුද්ධිය (AI)** යනු මිනිස් බුද්ධියෙන් සිදු කරන තීරණ ගැනීම, භාෂා තේරුම් ගැනීම හා ගැටළු විසඳීම පරිගණක පද්ධති මඟින් ස්වයංක්‍රීයව සිදු කිරීමේ තාක්ෂණයයි.`
+    },
+    docker: {
+      en: `**Docker** is an open-source containerization platform that packages applications and all their dependencies into lightweight, portable, and isolated containers that run reliably anywhere.`,
+      si: `**Docker** යනු මෘදුකාංග සහ ඒවායේ dependencies එක් සංයුක්ත Container එකක් ලෙස සකස් කර ඕනෑම පරිසරයක ධාවනය කිරීමට සහාය වන ප්‍රමුඛ Containerization තාක්ෂණයයි.`
+    }
+  };
+
+  // Check if message is a direct definition question like "what is xmr", "who is...", "explain xmr"
+  const isDirectQuestion = /^(?:what\s+is|what's|define|who\s+is|explain|tell\s+me\s+about|මොකක්ද|මොකද්ද|යනු\s+කුමක්ද)\s*(?:a\s+|an\s+|the\s+)?([a-z0-9\-_]+)/i.test(msgLower);
+  const matchedTerm = Object.keys(knowledgeMap).find(k => 
+    msgLower === k || 
+    msgLower === `what is ${k}` || 
+    msgLower === `what's ${k}` || 
+    msgLower.includes(`what is ${k}`) ||
+    msgLower.includes(`what's ${k}`) ||
+    msgLower.includes(`explain ${k}`) ||
+    msgLower.includes(`${k} කියන්නේ මොකක්ද`)
+  );
+
+  if (matchedTerm && knowledgeMap[matchedTerm]) {
+    const item = knowledgeMap[matchedTerm];
+    return isSi ? item.si : item.en;
+  }
+
+  // Build Live Web Section & Detailed Knowledge Synthesis
+  if (webReport && webReport.results.length > 0) {
+    const primary = webReport.results[0];
+    const otherResults = webReport.results.slice(1);
+
+    if (isSi) {
+      let siReply = `### ${primary.title}\n\n${primary.snippet}\n\n`;
+
+      if (otherResults.length > 0) {
+        siReply += `#### ප්‍රධාන කරුණු හා අමතර තොරතුරු (Key Details & Insights):\n`;
+        otherResults.forEach((r, idx) => {
+          siReply += `• **${r.title.replace(/— Live Web Result.*$/i, "").trim()}**: ${r.snippet}\n`;
+        });
+        siReply += `\n`;
+      }
+
+      siReply += `🌐 **සජීවී අන්තර්ජාල මූලාශ්‍ර (Live Grounded Sources):**\n`;
+      webReport.results.forEach((r, idx) => {
+        siReply += `[${idx + 1}] [${r.title}](${r.url}) — *${r.source}*\n`;
+      });
+
+      return siReply;
+    } else {
+      let enReply = `### ${primary.title}\n\n${primary.snippet}\n\n`;
+
+      if (otherResults.length > 0) {
+        enReply += `#### Key Details & Core Insights:\n`;
+        otherResults.forEach((r, idx) => {
+          const cleanTitle = r.title.replace(/— Live Web Result.*$/i, "").trim();
+          enReply += `• **${cleanTitle}**: ${r.snippet}\n\n`;
+        });
+      }
+
+      enReply += `🌐 **Live Web Intelligence Sources & References:**\n`;
+      webReport.results.forEach((r, idx) => {
+        enReply += `• [${r.title}](${r.url}) — *${r.source}*\n`;
+      });
+
+      return enReply;
+    }
+  }
+
+  // Declare web insights snippet
   let webInsights = "";
   if (webReport && webReport.results.length > 0) {
     if (isSi) {
-      webInsights = `\n\n🌐 **සජීවී අන්තර්ජාල ගවේෂණ ප්‍රතිඵල (Live Web Grounding):**\n`;
-      webInsights += webReport.results
-        .map((r, i) => `**${i + 1}. ${r.title}**\n${r.snippet}\n🔗 [මූලාශ්‍රය: ${r.source}](${r.url})`)
-        .join("\n\n");
+      webInsights = `\n\n🌐 **සජීවී අන්තර්ජාල මූලාශ්‍ර (Live Grounded Sources):**\n` +
+        webReport.results.map((r, i) => `[${i + 1}] [${r.title}](${r.url}) — *${r.source}*`).join("\n");
     } else {
-      webInsights = `\n\n🌐 **Live Web Intelligence & Grounded Sources:**\n`;
-      webInsights += webReport.results
-        .map((r, i) => `**${i + 1}. ${r.title}**\n${r.snippet}\n🔗 [Source: ${r.source}](${r.url})`)
-        .join("\n\n");
+      webInsights = `\n\n🌐 **Live Web Intelligence Sources:**\n` +
+        webReport.results.map((r, i) => `• [${r.title}](${r.url}) — *${r.source}*`).join("\n");
     }
   }
 

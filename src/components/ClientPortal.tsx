@@ -87,7 +87,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   // Voice Interaction State
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [isWakeWordActive, setIsWakeWordActive] = useState(false);
   const [speechInterim, setSpeechInterim] = useState("");
 
@@ -95,6 +95,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [learnedNotification, setLearnedNotification] = useState<{ title: string; detail: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const synthesisUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
@@ -238,6 +239,11 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     startNewChat(newMode);
   };
 
+  // Focus input on mount and keep continuous
+  useEffect(() => {
+    chatInputRef.current?.focus();
+  }, []);
+
   // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -345,7 +351,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     }
   };
 
-  // Text-To-Speech
+  // Text-To-Speech with pleasant female voice selection
   const speakText = (text: string) => {
     if (isMuted || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -357,7 +363,44 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = language === "si" ? "si-LK" : "en-US";
     utterance.rate = userProfile?.preferences?.voiceSpeed || 1.0;
-    utterance.pitch = userProfile?.preferences?.voicePitch || 1.0;
+    utterance.pitch = userProfile?.preferences?.voicePitch || 1.15; // Pleasant feminine pitch
+
+    // Choose sweet female/girl voice across Windows, Mac, Android, ChromeOS
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      const voices = window.speechSynthesis.getVoices();
+      let pickedVoice: SpeechSynthesisVoice | undefined;
+
+      if (language === "si") {
+        pickedVoice = voices.find(v => v.lang.includes("si") || v.lang.includes("LK"));
+      }
+
+      if (!pickedVoice) {
+        pickedVoice = voices.find(v => {
+          const n = v.name.toLowerCase();
+          return (
+            n.includes("female") || 
+            n.includes("zira") || 
+            n.includes("samantha") || 
+            n.includes("karen") || 
+            n.includes("victoria") || 
+            n.includes("google uk english female") || 
+            n.includes("google us english female") || 
+            n.includes("jenny") || 
+            n.includes("aria") || 
+            n.includes("susan") ||
+            n.includes("eva")
+          ) && (v.lang.startsWith("en") || v.lang.startsWith("si"));
+        });
+      }
+
+      if (!pickedVoice) {
+        pickedVoice = voices.find(v => v.lang.startsWith("en") && !v.name.toLowerCase().includes("male") && !v.name.toLowerCase().includes("david") && !v.name.toLowerCase().includes("george"));
+      }
+
+      if (pickedVoice) {
+        utterance.voice = pickedVoice;
+      }
+    }
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
@@ -692,16 +735,27 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 </h1>
                 <button
                   type="button"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className={`text-[9px] sm:text-[10px] border px-2 py-0.5 rounded-full font-bold font-mono transition cursor-pointer flex items-center gap-1 ${
+                  onClick={() => {
+                    const next = sofiEdition === "pro" ? "free" : "pro";
+                    handleSelectEdition(next);
+                  }}
+                  className={`text-[9px] sm:text-[10px] border px-2.5 py-0.5 rounded-full font-bold font-mono transition cursor-pointer flex items-center gap-1.5 shadow-sm ${
                     sofiEdition === "pro"
-                      ? "bg-gradient-to-r from-[#FF6A3D]/20 to-amber-500/20 text-[#FF8A50] border-[#FF6A3D]/40 hover:border-[#FF6A3D]"
-                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:border-emerald-500/60"
+                      ? "bg-gradient-to-r from-[#FF6A3D] to-amber-500 text-white border-orange-400 hover:brightness-110"
+                      : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30"
                   }`}
-                  title="Click to configure Sofi Free vs Pro Edition"
+                  title={`Click to switch between Free and Pro (Currently: ${sofiEdition.toUpperCase()})`}
                 >
-                  <span>{sofiEdition === "pro" ? "Sofi Pro" : "Sofi Free"}</span>
-                  <Settings className="w-2.5 h-2.5" />
+                  <span>{sofiEdition === "pro" ? "✨ Pro Active" : "⚡ Free Active"}</span>
+                  <span className="text-[8.5px] opacity-80 underline">Switch</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="p-1 text-amber-200/60 hover:text-amber-200 transition cursor-pointer"
+                  title="Open Settings & Model Details"
+                >
+                  <Settings className="w-3 h-3" />
                 </button>
               </div>
 
@@ -1206,6 +1260,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               </button>
 
               <input
+                ref={chatInputRef}
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
@@ -1229,7 +1284,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                     : "Ask Sofi anything, upload documents/photos, or teach a memory..."
                 }
                 className="flex-1 bg-transparent text-xs sm:text-sm text-white px-2 focus:outline-none placeholder:text-amber-200/30 font-medium"
-                disabled={isTyping}
               />
 
               {/* Send Button */}

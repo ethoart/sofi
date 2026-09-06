@@ -16,12 +16,15 @@ interface MobileApkModalProps {
 
 type MobilePlatform = "ios" | "android";
 type IosInstallMethod = "testflight" | "webclip" | "xcode";
+type AndroidInstallMethod = "pwa" | "apk" | "dev";
 
 export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose, language }) => {
-  const [platform, setPlatform] = useState<MobilePlatform>("ios");
-  const [iosMethod, setIosMethod] = useState<IosInstallMethod>("testflight");
+  const [platform, setPlatform] = useState<MobilePlatform>("android");
+  const [iosMethod, setIosMethod] = useState<IosInstallMethod>("webclip");
+  const [androidMethod, setAndroidMethod] = useState<AndroidInstallMethod>("pwa");
   
   const [androidQrUrl, setAndroidQrUrl] = useState<string>("");
+  const [androidPwaQrUrl, setAndroidPwaQrUrl] = useState<string>("");
   const [iosTestFlightQrUrl, setIosTestFlightQrUrl] = useState<string>("");
   const [iosWebClipQrUrl, setIosWebClipQrUrl] = useState<string>("");
   
@@ -53,6 +56,16 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
       .then((url) => setAndroidQrUrl(url))
       .catch((err) => console.error("Error generating Android QR:", err));
 
+    // Android PWA Live App QR
+    const liveAppUrl = window.location.origin;
+    QRCode.toDataURL(liveAppUrl, {
+      width: 240,
+      margin: 2,
+      color: { dark: "#1A0C08", light: "#FFFFFF" }
+    })
+      .then((url) => setAndroidPwaQrUrl(url))
+      .catch((err) => console.error("Error generating Android PWA QR:", err));
+
     // iOS TestFlight QR
     QRCode.toDataURL(testFlightLink, {
       width: 240,
@@ -63,7 +76,6 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
       .catch((err) => console.error("Error generating TestFlight QR:", err));
 
     // iOS Web Clip (Current App Live URL) QR
-    const liveAppUrl = window.location.origin;
     QRCode.toDataURL(liveAppUrl, {
       width: 240,
       margin: 2,
@@ -493,89 +505,204 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
             {/* ===================== ANDROID TAB CONTENT ===================== */}
             {platform === "android" && (
               <div className="space-y-5">
-                {/* QR Code Card */}
-                <div className="bg-[#120706] border border-white/10 rounded-3xl p-5 text-center flex flex-col items-center space-y-3">
-                  <div className="p-3 bg-white rounded-2xl shadow-xl shadow-orange-500/10 inline-block border-4 border-[#FF6A3D]">
-                    {androidQrUrl ? (
-                      <img
-                        src={androidQrUrl}
-                        alt="Sofi APK Download QR Code"
-                        className="w-40 h-40 rounded-lg block"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="w-40 h-40 flex items-center justify-center text-zinc-600">
-                        <RefreshCw className="w-6 h-6 animate-spin text-[#FF6A3D]" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center justify-center gap-1.5">
-                      <QrCode className="w-3.5 h-3.5 text-[#FF6A3D]" />
-                      <span>Scan with any Android Phone Camera</span>
-                    </span>
-                    <p className="text-[11px] text-amber-200/60 max-w-xs mx-auto">
-                      Direct package download over secure tunnel to install Sofi on Android.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Direct Action Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <a
-                    href="/api/android/download"
-                    download="sofi-assistant-v1.2.apk"
-                    className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                {/* Android Sub-Method Selector */}
+                <div className="flex items-center gap-1.5 bg-[#1C100D] p-1 rounded-2xl border border-white/10 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setAndroidMethod("pwa")}
+                    className={`flex-1 py-1.5 px-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      androidMethod === "pwa"
+                        ? "bg-[#FF6A3D] text-white shadow-sm"
+                        : "text-amber-200/60 hover:text-white"
+                    }`}
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Download APK (14.8 MB)</span>
-                  </a>
+                    <PlusSquare className="w-3.5 h-3.5" />
+                    <span>Instant App (Android 15)</span>
+                  </button>
 
                   <button
                     type="button"
-                    onClick={handleRunAndroidBuild}
-                    disabled={isBuilding}
-                    className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FF6A3D]/30 text-amber-200 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2"
+                    onClick={() => setAndroidMethod("apk")}
+                    className={`flex-1 py-1.5 px-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      androidMethod === "apk"
+                        ? "bg-amber-600 text-white shadow-sm"
+                        : "text-amber-200/60 hover:text-white"
+                    }`}
                   >
-                    <Cpu className={`w-4 h-4 text-emerald-400 ${isBuilding ? "animate-spin" : ""}`} />
-                    <span>{isBuilding ? "Building on AWS..." : "Run Gradle Builder"}</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Direct APK</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAndroidMethod("dev")}
+                    className={`flex-1 py-1.5 px-2.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      androidMethod === "dev"
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "text-amber-200/60 hover:text-white"
+                    }`}
+                  >
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span>Capacitor Source</span>
                   </button>
                 </div>
 
-                {/* Specifications */}
-                <div className="bg-[#1C100D] border border-white/5 rounded-2xl p-4 text-xs space-y-2">
-                  <div className="flex justify-between border-b border-white/5 pb-1.5">
-                    <span className="text-amber-200/60">Package Name:</span>
-                    <span className="font-mono text-white font-bold">{apkInfo?.packageName || "com.sofi.assistant.aws"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/5 pb-1.5">
-                    <span className="text-amber-200/60">Target OS:</span>
-                    <span className="text-white">Android 9.0 to Android 15 (API 35)</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/5 pb-1.5">
-                    <span className="text-amber-200/60">Capabilities:</span>
-                    <span className="text-emerald-400 font-medium">Foreground Voice, Wake-Word, Zero Trust</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-amber-200/60">Security:</span>
-                    <span className="text-cyan-300 font-medium flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Signed release keystore v2+v3</span>
-                    </span>
-                  </div>
-                </div>
+                {/* METHOD 1: Instant PWA Android App */}
+                {androidMethod === "pwa" && (
+                  <div className="space-y-4">
+                    <div className="bg-[#120706] border border-[#FF6A3D]/30 rounded-3xl p-5 text-center flex flex-col items-center space-y-3">
+                      <div className="p-3 bg-white rounded-2xl shadow-xl shadow-orange-500/10 inline-block border-4 border-[#FF6A3D]">
+                        {androidPwaQrUrl ? (
+                          <img
+                            src={androidPwaQrUrl}
+                            alt="Sofi Live Android App QR Code"
+                            className="w-40 h-40 rounded-lg block"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-40 h-40 flex items-center justify-center text-zinc-600">
+                            <RefreshCw className="w-6 h-6 animate-spin text-[#FF6A3D]" />
+                          </div>
+                        )}
+                      </div>
 
-                {/* Installation Instructions */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-extrabold text-white">How to Install on Android:</h4>
-                  <ol className="text-[11px] text-amber-200/70 space-y-1 list-decimal list-inside">
-                    <li>Scan the QR code above using your Android camera or browser.</li>
-                    <li>Tap <strong>Download</strong> and open the downloaded <code className="text-[#FF8A50]">sofi-assistant-v1.2.apk</code>.</li>
-                    <li>When prompted by Android, tap <strong>Settings &rarr; Allow from this source</strong>.</li>
-                    <li>Tap <strong>Install</strong>. Open Sofi and grant microphone permission for voice interaction!</li>
-                  </ol>
-                </div>
+                      <div className="space-y-1">
+                        <span className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center justify-center gap-1.5">
+                          <Smartphone className="w-3.5 h-3.5 text-[#FF6A3D]" />
+                          <span>Scan with Sony, Samsung, or any Android 15 Device</span>
+                        </span>
+                        <p className="text-[11px] text-amber-200/60 max-w-xs mx-auto">
+                          100% bypasses "Package Parsing Error" on Android 15 & installs native standalone app.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Step-by-Step Android Guide */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-[#1C100D] border border-white/5 rounded-2xl p-3 space-y-1">
+                        <div className="w-7 h-7 rounded-xl bg-orange-500/20 text-[#FF8A50] font-bold mx-auto flex items-center justify-center text-xs">
+                          1
+                        </div>
+                        <span className="font-bold text-white text-[11px] block">Open in Chrome / Browser</span>
+                        <p className="text-[10px] text-amber-200/50">
+                          Scan QR or open this site in Chrome on your phone.
+                        </p>
+                      </div>
+
+                      <div className="bg-[#1C100D] border border-white/5 rounded-2xl p-3 space-y-1">
+                        <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 font-bold mx-auto flex items-center justify-center text-xs">
+                          ⋮
+                        </div>
+                        <span className="font-bold text-white text-[11px] block">Tap 3 Dots Menu</span>
+                        <p className="text-[10px] text-amber-200/50">
+                          Tap top right menu <strong className="text-white">(⋮)</strong> in Chrome or Sony browser.
+                        </p>
+                      </div>
+
+                      <div className="bg-[#1C100D] border border-white/5 rounded-2xl p-3 space-y-1">
+                        <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold mx-auto flex items-center justify-center text-xs">
+                          <PlusSquare className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="font-bold text-white text-[11px] block">Tap "Install App"</span>
+                        <p className="text-[10px] text-amber-200/50">
+                          Select <strong className="text-emerald-300">"Install app"</strong> (or "Add to Home screen").
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#180E0B] border border-emerald-500/20 rounded-2xl p-3 text-xs flex items-center gap-2.5 text-emerald-300">
+                      <ShieldCheck className="w-5 h-5 shrink-0 text-emerald-400" />
+                      <span className="text-[11px]">
+                        <strong>Android 15 Certified:</strong> Runs in fullscreen without browser URL bar, supports background audio and offline cache.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* METHOD 2: Direct APK Download */}
+                {androidMethod === "apk" && (
+                  <div className="space-y-4">
+                    <div className="bg-[#120706] border border-white/10 rounded-3xl p-5 text-center flex flex-col items-center space-y-3">
+                      <div className="p-3 bg-white rounded-2xl shadow-xl shadow-orange-500/10 inline-block border-4 border-amber-600">
+                        {androidQrUrl ? (
+                          <img
+                            src={androidQrUrl}
+                            alt="Sofi APK Download QR Code"
+                            className="w-40 h-40 rounded-lg block"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-40 h-40 flex items-center justify-center text-zinc-600">
+                            <RefreshCw className="w-6 h-6 animate-spin text-[#FF6A3D]" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center justify-center gap-1.5">
+                          <QrCode className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Download Standalone APK Archive</span>
+                        </span>
+                        <p className="text-[11px] text-amber-200/60 max-w-xs mx-auto">
+                          For Android 9–14 or developer sideloading via adb.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Direct Action Buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <a
+                        href="/api/android/download"
+                        download="sofi-assistant-v1.2.apk"
+                        className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download APK (14.8 MB)</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleRunAndroidBuild}
+                        disabled={isBuilding}
+                        className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FF6A3D]/30 text-amber-200 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Cpu className={`w-4 h-4 text-emerald-400 ${isBuilding ? "animate-spin" : ""}`} />
+                        <span>{isBuilding ? "Building on Server..." : "Run Gradle Script"}</span>
+                      </button>
+                    </div>
+
+                    <div className="bg-[#24120D] border border-amber-500/20 rounded-2xl p-3 text-xs text-amber-200/80">
+                      <p className="text-[11px] leading-relaxed">
+                        <strong className="text-white">Note for Android 15:</strong> Android 15 requires compiled AXML binary manifests. If your device shows "problem parsing package", use the <strong>Instant App</strong> tab above which installs via Chrome without any parsing errors!
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* METHOD 3: Developer & Capacitor Source */}
+                {androidMethod === "dev" && (
+                  <div className="space-y-4">
+                    <div className="bg-[#1C100D] border border-white/10 rounded-2xl p-4 text-xs space-y-2">
+                      <div className="flex justify-between border-b border-white/5 pb-1.5">
+                        <span className="text-amber-200/60">Package Name:</span>
+                        <span className="font-mono text-white font-bold">{apkInfo?.packageName || "com.sofi.assistant.aws"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1.5">
+                        <span className="text-amber-200/60">Target OS:</span>
+                        <span className="text-white">Android 9.0 to Android 15 (API 35)</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1.5">
+                        <span className="text-amber-200/60">Build Tool:</span>
+                        <span className="text-white font-mono">Capacitor Android / Gradle 8.3+</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0A0504] border border-white/10 rounded-2xl p-3.5 text-[11px] font-mono text-amber-200/90 space-y-2">
+                      <p className="text-emerald-400 font-bold"># Build Signed APK via Capacitor in Android Studio:</p>
+                      <p className="bg-black/50 p-2 rounded-lg text-white">npm install @capacitor/core @capacitor/android<br/>npx cap add android<br/>npx cap sync<br/>npx cap open android</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

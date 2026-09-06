@@ -38,12 +38,18 @@ export const SofiChat: React.FC<SofiChatProps> = ({
   const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const synthesisUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Auto focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   // Auto scroll
   useEffect(() => {
@@ -160,15 +166,39 @@ export const SofiChat: React.FC<SofiChatProps> = ({
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
 
-    // Try to find native Sinhala or English voices
+    // Try to find pleasant female voices
     const voices = window.speechSynthesis.getVoices();
+    let pickedVoice: SpeechSynthesisVoice | undefined;
+
     if (language === "si") {
-      const siVoice = voices.find(v => v.lang.includes("si") || v.lang.includes("LK"));
-      if (siVoice) utterance.voice = siVoice;
-    } else {
-      const enVoice = voices.find(v => v.lang.includes("en-US") || v.lang.includes("en-GB"));
-      if (enVoice) utterance.voice = enVoice;
+      pickedVoice = voices.find(v => v.lang.includes("si") || v.lang.includes("LK"));
     }
+
+    if (!pickedVoice) {
+      pickedVoice = voices.find(v => {
+        const n = v.name.toLowerCase();
+        return (
+          n.includes("female") || 
+          n.includes("zira") || 
+          n.includes("samantha") || 
+          n.includes("karen") || 
+          n.includes("victoria") || 
+          n.includes("google uk english female") || 
+          n.includes("google us english female") || 
+          n.includes("jenny") || 
+          n.includes("aria") || 
+          n.includes("susan") ||
+          n.includes("eva")
+        ) && (v.lang.startsWith("en") || v.lang.startsWith("si"));
+      });
+    }
+
+    if (!pickedVoice) {
+      pickedVoice = voices.find(v => v.lang.startsWith("en") && !v.name.toLowerCase().includes("male"));
+    }
+
+    if (pickedVoice) utterance.voice = pickedVoice;
+    utterance.pitch = 1.15; // Natural feminine pitch
 
     synthesisUtteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
@@ -179,6 +209,7 @@ export const SofiChat: React.FC<SofiChatProps> = ({
     if (!text) return;
 
     setInputText("");
+    inputRef.current?.focus();
     
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -463,6 +494,7 @@ export const SofiChat: React.FC<SofiChatProps> = ({
 
           {/* Text input */}
           <input
+            ref={inputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

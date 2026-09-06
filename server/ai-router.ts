@@ -50,6 +50,7 @@ export interface RouterOutput {
     | "glm-5.3"
     | "gpt-5.6-sol"
     | "gpt-4o"
+    | "gemini-2.5-flash"
     | "gemini-3.8-flash"
     | string;
   modelLabel: string;
@@ -127,7 +128,8 @@ export async function callAgentRouterFrontierModel(
 export function pickOptimalModel(
   message: string,
   mode: string,
-  attachments?: ChatAttachment[]
+  attachments?: ChatAttachment[],
+  edition?: "free" | "pro"
 ): {
   modelId:
     | "sofi-lbgm"
@@ -138,10 +140,20 @@ export function pickOptimalModel(
     | "glm-5.3"
     | "gpt-5.6-sol"
     | "gpt-4o"
+    | "gemini-2.5-flash"
     | "gemini-3.8-flash";
   label: string;
   reason: string;
 } {
+  // If explicitly free edition, use local engine
+  if (edition === "free") {
+    return {
+      modelId: "sofi-lbgm",
+      label: "Sofi Free Local Engine",
+      reason: "Sofi Free Edition: Local CPU Inference with zero external latency"
+    };
+  }
+
   const text = (message || "").toLowerCase().trim();
   const hasImages = attachments?.some((a) => a.type === "image");
   const hasDocs = attachments?.some((a) => a.type === "document");
@@ -212,9 +224,9 @@ export function pickOptimalModel(
     }
     if (hasGemini) {
       return {
-        modelId: "gemini-3.8-flash",
-        label: "Gemini 3.8 Flash (Multimodal)",
-        reason: "Visual & Photo Analysis → Routed to Gemini 3.8 Flash Multimodal"
+        modelId: "gemini-2.5-flash",
+        label: "Gemini 2.5 Flash (Vision)",
+        reason: "Visual & Photo Analysis → Routed to Gemini 2.5 Flash Multimodal"
       };
     }
     return {
@@ -224,20 +236,7 @@ export function pickOptimalModel(
     };
   }
 
-  // 2. Simple tasks -> Handled by Sofi Internal LBGM (Fast, zero-latency, local memory)
-  const isGreeting = /^(hi|hello|hey|ayubowan|kohomada|good\s+(morning|afternoon|evening)|sup|how\s+are\s+you|sthuthiyi|thanks|thank\s+you|oya\s+kauda|who\s+are\s+you)/i.test(text);
-  const isMemoryOrVocab = /(remember\s+that|what\s+do\s+you\s+remember|mathakada|my\s+name|who\s+am\s+i|learn\s+word|teach\s+word|sinhala\s+word)/i.test(text);
-  const isSimpleShort = text.length <= 60 && !hasDocs && !/(code|script|algorithm|implement|refactor|analyze|investigate|architecture)/i.test(text);
-
-  if (isGreeting || isMemoryOrVocab || isSimpleShort) {
-    return {
-      modelId: "sofi-lbgm",
-      label: "Sofi Internal LBGM",
-      reason: "Simple Task & Memory Lookup → Handled instantly by Sofi Internal LBGM"
-    };
-  }
-
-  // 3. Complex Coding, Software Development, Scripting, DevOps -> Best with Claude 3.5 Sonnet / DeepSeek
+  // 2. Complex Coding, Software Development, Scripting, DevOps
   const isCodingTask =
     mode === "coding" ||
     /(typescript|javascript|python|rust|golang|c\+\+|docker|bash|terminal|debug|refactor|function|algorithm|class\s+|api\s+endpoint|sql\s+query|database\s+schema|write\s+code|syntax)/i.test(text);
@@ -250,14 +249,23 @@ export function pickOptimalModel(
         reason: "Complex Coding & DevOps → Dispatched to DeepSeek v4 Flash via AgentRouter"
       };
     }
-    return {
-      modelId: "claude-3-5-sonnet",
-      label: "Claude 3.5 Sonnet",
-      reason: "Complex Coding & DevOps → Dispatched to Claude 3.5 Sonnet"
-    };
+    if (hasClaude) {
+      return {
+        modelId: "claude-3-5-sonnet",
+        label: "Claude 3.5 Sonnet",
+        reason: "Complex Coding & DevOps → Dispatched to Claude 3.5 Sonnet"
+      };
+    }
+    if (hasGemini) {
+      return {
+        modelId: "gemini-2.5-flash",
+        label: "Gemini 2.5 Flash",
+        reason: "Complex Coding & DevOps → Dispatched to Gemini 2.5 Flash"
+      };
+    }
   }
 
-  // 4. In-depth Reasoning, Multi-Perspective Research, Strategy -> Best with ChatGPT (GPT-4o) / Claude Opus
+  // 3. In-depth Reasoning, Multi-Perspective Research, Strategy
   const isDeepReasoning =
     mode === "research" ||
     /(analyze|compare|contrast|trade-offs|strategy|synthesis|deep\s+research|pros\s+and\s+cons|evaluation|breakdown|framework)/i.test(text);
@@ -270,14 +278,23 @@ export function pickOptimalModel(
         reason: "Advanced Deep Reasoning & Strategy → Dispatched to Claude Opus 5 via AgentRouter"
       };
     }
-    return {
-      modelId: "gpt-4o",
-      label: "ChatGPT (GPT-4o)",
-      reason: "Advanced Reasoning & Strategy → Dispatched to ChatGPT (GPT-4o)"
-    };
+    if (hasOpenAi) {
+      return {
+        modelId: "gpt-4o",
+        label: "ChatGPT (GPT-4o)",
+        reason: "Advanced Reasoning & Strategy → Dispatched to ChatGPT (GPT-4o)"
+      };
+    }
+    if (hasGemini) {
+      return {
+        modelId: "gemini-2.5-flash",
+        label: "Gemini 2.5 Flash",
+        reason: "Advanced Reasoning & Strategy → Dispatched to Gemini 2.5 Flash"
+      };
+    }
   }
 
-  // 5. Document Comprehension or Long Text
+  // 4. Document Comprehension or Long Text
   if (hasDocs || text.length > 500) {
     if (hasAgentRouter || hasClaude) {
       return {
@@ -295,19 +312,43 @@ export function pickOptimalModel(
     }
     if (hasGemini) {
       return {
-        modelId: "gemini-3.8-flash",
-        label: "Gemini 3.8 Flash",
-        reason: "Document Analysis & Synthesis → Routed to Gemini 3.8 Flash"
+        modelId: "gemini-2.5-flash",
+        label: "Gemini 2.5 Flash",
+        reason: "Document Analysis & Synthesis → Routed to Gemini 2.5 Flash"
       };
     }
   }
 
-  // Default balanced assignment
+  // If in Pro mode: use highest quality available frontier model
   if (hasAgentRouter) {
     return {
       modelId: "glm-5.3",
       label: "GLM 5.3 (AgentRouter)",
-      reason: "Balanced Task & Multilingual Flow → Dispatched to GLM 5.3 via AgentRouter"
+      reason: "Sofi Pro: Dispatched to GLM 5.3 via AgentRouter"
+    };
+  }
+
+  if (hasGemini) {
+    return {
+      modelId: "gemini-2.5-flash",
+      label: "Gemini 2.5 Flash (Frontier Pro)",
+      reason: "Sofi Pro: Connected to Gemini 2.5 Flash Frontier AI"
+    };
+  }
+
+  if (hasClaude) {
+    return {
+      modelId: "claude-3-5-sonnet",
+      label: "Claude 3.5 Sonnet",
+      reason: "Sofi Pro: Connected to Claude 3.5 Sonnet"
+    };
+  }
+
+  if (hasOpenAi) {
+    return {
+      modelId: "gpt-4o",
+      label: "ChatGPT (GPT-4o)",
+      reason: "Sofi Pro: Connected to ChatGPT (GPT-4o)"
     };
   }
 
@@ -609,12 +650,22 @@ async function callGemini(
     userParts.push({ text: enrichedMessage });
     contents.push({ role: "user", parts: userParts });
 
-    const chatResult = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents
-    });
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    for (const modelName of modelsToTry) {
+      try {
+        const chatResult = await ai.models.generateContent({
+          model: modelName,
+          contents
+        });
+        if (chatResult && chatResult.text) {
+          return chatResult.text;
+        }
+      } catch (err) {
+        console.warn(`[Gemini] model ${modelName} error, trying fallback...`);
+      }
+    }
 
-    return chatResult.text || null;
+    return null;
   } catch (e) {
     console.error("Error in Gemini API call:", e);
     return null;
@@ -814,6 +865,7 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     | "glm-5.3"
     | "gpt-5.6-sol"
     | "gpt-4o"
+    | "gemini-2.5-flash"
     | "gemini-3.8-flash";
   let targetLabel: string;
   let routingReason: string;
@@ -847,12 +899,12 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     targetLabel = "ChatGPT (GPT-4o)";
     routingReason = "User Selected: ChatGPT (GPT-4o)";
   } else if (selectedModel === "gemini") {
-    targetModel = "gemini-3.8-flash";
-    targetLabel = "Gemini 3.8 Flash";
-    routingReason = "User Selected: Gemini 3.8 Flash";
+    targetModel = "gemini-2.5-flash";
+    targetLabel = "Gemini 2.5 Flash";
+    routingReason = "User Selected: Gemini 2.5 Flash (Frontier AI)";
   } else {
-    // Auto Mode: Pick optimal model dynamically
-    const optimal = pickOptimalModel(message, mode, attachments);
+    // Auto Mode: Pick optimal model dynamically based on edition and capabilities
+    const optimal = pickOptimalModel(message, mode, attachments, input.edition);
     targetModel = optimal.modelId;
     targetLabel = optimal.label;
     routingReason = optimal.reason;
@@ -882,13 +934,6 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     }
 
     // Graceful fallback if AGENTROUTER_API_KEY is not configured or fails
-    const agentRouterKey = process.env.AGENTROUTER_API_KEY;
-    const isMissingKey =
-      !agentRouterKey ||
-      !agentRouterKey.trim() ||
-      agentRouterKey === "your_agent_router_api_key_here";
-
-    // Fallback: Try Claude, OpenAI, Gemini (if configured), then Sofi Internal LBGM
     const claudeFallback = await callClaude(input, enrichedMessage);
     if (claudeFallback) {
       return {
@@ -916,9 +961,9 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       if (geminiReply) {
         return {
           reply: geminiReply,
-          modelUsed: "gemini-3.8-flash",
-          modelLabel: `Gemini 3.8 Flash (${meta.label} Fallback)`,
-          routingReason: `${routingReason} → Assisted by Gemini 3.8 Flash`,
+          modelUsed: "gemini-2.5-flash",
+          modelLabel: `Gemini 2.5 Flash (${meta.label} Fallback)`,
+          routingReason: `${routingReason} → Assisted by Gemini 2.5 Flash`,
           fallbackOccurred: true
         };
       }
@@ -945,7 +990,8 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       userProfile: input.userProfile,
       memories: input.memories,
       vocab: input.vocab,
-      attachments: input.attachments
+      attachments: input.attachments,
+      forceWebSearch: input.forceWebSearch
     });
 
     return {
@@ -987,9 +1033,9 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       if (geminiReply) {
         return {
           reply: geminiReply,
-          modelUsed: "gemini-3.8-flash",
-          modelLabel: "Gemini 3.8 Flash (Fallback)",
-          routingReason: `${routingReason} → Assisted by Gemini`,
+          modelUsed: "gemini-2.5-flash",
+          modelLabel: "Gemini 2.5 Flash (Fallback)",
+          routingReason: `${routingReason} → Assisted by Gemini 2.5 Flash`,
           fallbackOccurred: true
         };
       }
@@ -1024,9 +1070,9 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     if (geminiReply) {
       return {
         reply: geminiReply,
-        modelUsed: "gemini-3.8-flash",
-        modelLabel: "Gemini 3.8 Flash (Fallback)",
-        routingReason: `${routingReason} → Transparently assisted by Gemini`,
+        modelUsed: "gemini-2.5-flash",
+        modelLabel: "Gemini 2.5 Flash (Fallback)",
+        routingReason: `${routingReason} → Transparently assisted by Gemini 2.5 Flash`,
         fallbackOccurred: true
       };
     }
@@ -1041,15 +1087,15 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     };
   }
 
-  // TARGET: Gemini 3.8 Flash
-  if (targetModel === "gemini-3.8-flash") {
+  // TARGET: Gemini 2.5 Flash / Gemini 3.8 Flash
+  if (targetModel === "gemini-2.5-flash" || targetModel === "gemini-3.8-flash") {
     const reply = await callGemini(input, enrichedMessage);
     if (reply) {
       return {
         reply,
-        modelUsed: "gemini-3.8-flash",
-        modelLabel: targetLabel,
-        routingReason
+        modelUsed: "gemini-2.5-flash",
+        modelLabel: "Gemini 2.5 Flash (Frontier Pro)",
+        routingReason: `${routingReason} • Real-time Frontier Multimodal API`
       };
     }
 

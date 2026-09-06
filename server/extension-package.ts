@@ -82,15 +82,38 @@ export async function buildExtensionPackage(options?: { serverUrl?: string }): P
   }
 
   // Copy icon if available, or generate standard icon
-  const sourceIconPath = path.join(PUBLIC_DIR, "sofi-chibi.png");
-  if (fs.existsSync(sourceIconPath)) {
-    try {
-      fs.copyFileSync(sourceIconPath, path.join(iconsDir, "icon16.png"));
-      fs.copyFileSync(sourceIconPath, path.join(iconsDir, "icon48.png"));
-      fs.copyFileSync(sourceIconPath, path.join(iconsDir, "icon128.png"));
-    } catch (e) {
-      console.warn("[Extension Builder] Icon copy warning:", e);
+  const candidateIcons = [
+    path.join(PUBLIC_DIR, "sofi-chibi.png"),
+    path.join(PUBLIC_DIR, "sofi-logo.jpg"),
+    path.join(process.cwd(), "src/assets/images/sofi_chibi_sticker_1788496148780.jpg"),
+    path.join(process.cwd(), "src/assets/images/sofi_anime_face_1788458075658.jpg")
+  ];
+
+  let copiedIcon = false;
+  for (const iconPath of candidateIcons) {
+    if (fs.existsSync(iconPath)) {
+      try {
+        fs.copyFileSync(iconPath, path.join(iconsDir, "icon16.png"));
+        fs.copyFileSync(iconPath, path.join(iconsDir, "icon48.png"));
+        fs.copyFileSync(iconPath, path.join(iconsDir, "icon128.png"));
+        fs.copyFileSync(iconPath, path.join(EXTENSION_DIR, "icon48.png"));
+        copiedIcon = true;
+        break;
+      } catch (e) {
+        console.warn("[Extension Builder] Icon copy warning:", e);
+      }
     }
+  }
+
+  // If no image file found, write a valid fallback 1x1 orange PNG buffer so Chrome never throws missing icon error
+  if (!copiedIcon || !fs.existsSync(path.join(iconsDir, "icon48.png"))) {
+    const pngFallback = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    fs.writeFileSync(path.join(iconsDir, "icon16.png"), pngFallback);
+    fs.writeFileSync(path.join(iconsDir, "icon48.png"), pngFallback);
+    fs.writeFileSync(path.join(iconsDir, "icon128.png"), pngFallback);
   }
 
   // 1. manifest.json
@@ -285,13 +308,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       </button>
     </div>
 
-    <!-- Sofi Auto-Intelligence Status Bar -->
+    <!-- Sofi Auto-Intelligence & Free/Pro Edition Bar -->
     <div class="model-bar">
-      <div class="auto-intelligence-indicator">
-        <span class="ai-sparkle">✨</span>
-        <span class="ai-title">Sofi Auto-Intelligence</span>
-        <span class="ai-badge">Autonomous Routing</span>
+      <div class="edition-toggle-wrapper">
+        <button type="button" id="freeEditionBtn" class="edition-btn active" title="Free Local SLM + Fast Reasoning">
+          ⚡ Free (Local)
+        </button>
+        <button type="button" id="proEditionBtn" class="edition-btn" title="Pro Frontier Models (Gemini, Claude, GPT-4o)">
+          ✨ Pro (Frontier)
+        </button>
       </div>
+      <div id="activeEditionLabel" class="ai-badge">Free Edition</div>
     </div>
 
     <!-- Chat Messages Stream -->
@@ -577,15 +604,46 @@ body {
   font-size: 12px;
 }
 
-/* Auto-Intelligence Bar */
+/* Auto-Intelligence Bar & Edition Switcher */
 .model-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 11px;
+}
+
+.edition-toggle-wrapper {
+  display: flex;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.edition-btn {
+  background: transparent;
+  border: none;
+  color: rgba(254, 235, 200, 0.7);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edition-btn:hover {
+  color: #FFFFFF;
+}
+
+.edition-btn.active {
+  background: #FF6A3D;
+  color: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(255, 106, 61, 0.4);
 }
 
 .auto-intelligence-indicator {
@@ -881,6 +939,31 @@ const pingResult = document.getElementById("pingResult");
 const connectionStatus = document.getElementById("connectionStatus");
 const statusText = document.getElementById("statusText");
 
+// Edition toggle
+const freeEditionBtn = document.getElementById("freeEditionBtn");
+const proEditionBtn = document.getElementById("proEditionBtn");
+const activeEditionLabel = document.getElementById("activeEditionLabel");
+let currentEdition = "free";
+
+function updateEditionUI(edition) {
+  currentEdition = edition;
+  if (freeEditionBtn && proEditionBtn && activeEditionLabel) {
+    if (edition === "pro") {
+      proEditionBtn.classList.add("active");
+      freeEditionBtn.classList.remove("active");
+      activeEditionLabel.textContent = "✨ Pro Frontier";
+      activeEditionLabel.style.color = "#FF8A50";
+      activeEditionLabel.style.borderColor = "rgba(255, 106, 61, 0.5)";
+    } else {
+      freeEditionBtn.classList.add("active");
+      proEditionBtn.classList.remove("active");
+      activeEditionLabel.textContent = "⚡ Free Local";
+      activeEditionLabel.style.color = "#34D399";
+      activeEditionLabel.style.borderColor = "rgba(52, 211, 153, 0.4)";
+    }
+  }
+}
+
 // Quick tools
 const summarizeTabBtn = document.getElementById("summarizeTabBtn");
 const explainSelectionBtn = document.getElementById("explainSelectionBtn");
@@ -892,16 +975,35 @@ const activeTabPill = document.getElementById("activeTabPill");
 const tabTitleText = document.getElementById("tabTitleText");
 const removeTabContextBtn = document.getElementById("removeTabContextBtn");
 
-// Initialize Settings
+// Initialize Settings & Edition
 function initSettings() {
-  chrome.storage.local.get(["sofiServerUrl", "sofiSelectedModel"], (res) => {
+  chrome.storage.local.get(["sofiServerUrl", "sofiSelectedModel", "sofiEdition"], (res) => {
     if (res.sofiServerUrl) {
       serverUrlInput.value = res.sofiServerUrl;
     }
     if (res.sofiSelectedModel && modelSelect) {
       modelSelect.value = res.sofiSelectedModel;
     }
+    if (res.sofiEdition) {
+      updateEditionUI(res.sofiEdition);
+    } else {
+      updateEditionUI("free");
+    }
     checkServerConnection();
+  });
+}
+
+if (freeEditionBtn) {
+  freeEditionBtn.addEventListener("click", () => {
+    updateEditionUI("free");
+    chrome.storage.local.set({ sofiEdition: "free" });
+  });
+}
+
+if (proEditionBtn) {
+  proEditionBtn.addEventListener("click", () => {
+    updateEditionUI("pro");
+    chrome.storage.local.set({ sofiEdition: "pro" });
   });
 }
 
@@ -1036,6 +1138,13 @@ function appendMessage(sender, text, meta = {}) {
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text.replace(/<[^>]*>?/gm, ''));
+        utter.pitch = 1.15;
+        const voices = window.speechSynthesis.getVoices();
+        const femaleVoice = voices.find(v => {
+          const n = v.name.toLowerCase();
+          return n.includes("female") || n.includes("zira") || n.includes("samantha") || n.includes("karen") || n.includes("jenny");
+        });
+        if (femaleVoice) utter.voice = femaleVoice;
         window.speechSynthesis.speak(utter);
       }
     };
@@ -1074,7 +1183,8 @@ async function handleSend(customText = null, additionalContext = null) {
     message: prompt,
     selectedModel,
     language: prompt.match(/[\\u0D80-\\u0DFF]/) ? "si" : "en",
-    mode: "general"
+    mode: "general",
+    edition: currentEdition
   };
 
   const contextToUse = additionalContext || activeTabContext;

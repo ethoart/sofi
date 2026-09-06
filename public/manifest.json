@@ -1,0 +1,19 @@
+{
+  "short_name": "Sofi AI",
+  "name": "Sofi AI Assistant",
+  "description": "Autonomous AI Companion with English & Sinhala voice, SLM, and reasoning models",
+  "icons": [
+    {
+      "src": "/sofi-logo.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#160B09",
+  "theme_color": "#160B09",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}

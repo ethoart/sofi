@@ -875,12 +875,13 @@ app.post("/api/chat", async (req, res) => {
   // 1. Run Sofi's Internal Cognitive SLM: Analyzes memory, language learning, and intent
   const slmAnalysis = analyzePromptWithSlm(message, currentLang);
   
-  // If the internal SLM has an immediate high-confidence local response (memory query, vocab learning) and no attachments
-  if (slmAnalysis.localReply && (!attachments || attachments.length === 0) && !forceWebSearch) {
+  // If in Free mode and the user is specifically giving a memory/vocab learning command
+  const isDirectMemoryCommand = /(remember\s+that|mathakada|what\s+do\s+you\s+remember|my\s+name\s+is|teach\s+word|sinhala\s+word)/i.test(userMsg);
+  if (currentEdition === "free" && isDirectMemoryCommand && slmAnalysis.localReply && (!attachments || attachments.length === 0) && !forceWebSearch) {
     return res.json({
       reply: slmAnalysis.localReply,
       modelUsed: "sofi-lbgm",
-      modelLabel: "Sofi Internal LBGM",
+      modelLabel: "Sofi Free (Local SLM)",
       routingReason: "Personal Memory & Vocabulary → Handled by Sofi Internal LBGM",
       learnedFact: slmAnalysis.extractedMemory,
       learnedVocab: slmAnalysis.extractedVocab,
