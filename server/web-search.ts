@@ -224,18 +224,13 @@ export function isLiveSearchQuery(prompt: string, mode?: string): boolean {
     return false;
   }
 
-  // Explicit search & query triggers
-  if (/(search|google|browse|research|look\s+up|find\s+out|tell\s+me\s+about|what\s+is|what\s+are|who\s+is|who\s+was|where\s+is|how\s+to|why\s+is|when\s+did|explain|details\s+of|information\s+on|news|price|weather|stock|crypto|xmr|btc|sol|eth|token|coin|monero|bitcoin|solana|ethereum|ai|docker|kubernetes|react|nextjs|python|rust|golang|market|status|specifications|features|guide|overview|summary)/i.test(clean)) {
+  // Explicit search & query triggers (only when user explicitly requests search or live market/news data)
+  if (/(search\s+for|search\s+web|google\s+for|browse\s+for|research\s+on|look\s+up|find\s+latest|current\s+price|live\s+price|stock\s+price|crypto\s+price|weather\s+in|latest\s+news|breaking\s+news)/i.test(clean)) {
     return true;
   }
 
-  // Time-sensitive queries (that are NOT simple date queries)
-  if (/(yesterday's\s+news|tomorrow's\s+schedule|this\s+week\s+news|this\s+year|2024|2025|2026|latest\s+news|breaking|score|current\s+price|newest)/i.test(clean)) {
-    return true;
-  }
-
-  // Any substantive complex question with punctuation
-  if (clean.length > 25 && (clean.endsWith("?") || clean.includes("how") || clean.includes("why"))) {
+  // Time-sensitive queries
+  if (/(yesterday's\s+news|tomorrow's\s+schedule|this\s+week\s+news|2024\s+news|2025\s+news|2026\s+news|latest\s+news|breaking|current\s+score)/i.test(clean)) {
     return true;
   }
 

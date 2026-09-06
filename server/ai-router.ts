@@ -890,8 +890,11 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     enrichedMessage = `${enrichedMessage}\n\n${docSummaries}`;
   }
 
+  // Check if an agent router key is available in env or input
+  const agentRouterKeyAvailable = Boolean(getAgentRouterKey(input));
+
   // 0. Handle Sofi Free Edition vs Pro Edition
-  if (input.edition === "free" || selectedModel === "lbgm") {
+  if (selectedModel === "lbgm" || ((input.edition === "free" && !agentRouterKeyAvailable) && selectedModel === "auto" && !prefixMatch)) {
     // FREE EDITION: Always execute via local Qwen 2.5 + Sofi Internal LBGM + Live Web Grounding
     const qwenResult = await executeQwenLbgmPipeline({
       message: enrichedMessage,
