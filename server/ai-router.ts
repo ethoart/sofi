@@ -275,12 +275,10 @@ async function callAgentRouter(
     formattedMessages.push({ role: "user", content: enrichedMessage });
   }
 
-  // Supported AgentRouter and compatible gateway endpoints
+  // Supported AgentRouter gateway endpoints
   const routerEndpoints = [
-    "https://agentrouter.org/v1/chat/completions",
     "https://co.agentrouter.org/v1/chat/completions",
-    "https://agentrouter.org/api/v1/chat/completions",
-    "https://openrouter.ai/api/v1/chat/completions"
+    "https://agentrouter.org/v1/chat/completions"
   ];
 
   let lastError = "";
