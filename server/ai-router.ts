@@ -275,9 +275,12 @@ async function callAgentRouter(
     formattedMessages.push({ role: "user", content: enrichedMessage });
   }
 
-  // Primary AgentRouter endpoint
+  // Supported AgentRouter and compatible gateway endpoints
   const routerEndpoints = [
-    "https://agentrouter.org/v1/chat/completions"
+    "https://agentrouter.org/v1/chat/completions",
+    "https://co.agentrouter.org/v1/chat/completions",
+    "https://agentrouter.org/api/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions"
   ];
 
   let lastError = "";
@@ -302,13 +305,24 @@ async function callAgentRouter(
       });
 
       if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (typeof content === "string" && content.trim()) {
-          return { text: content.trim() };
-        } else if (Array.isArray(content)) {
-          const textBlock = content.find((c: any) => c.type === "text" || c.text);
-          if (textBlock) return { text: (textBlock.text || textBlock.content || "").trim() };
+        const responseText = await res.text();
+        if (responseText.trim().startsWith("<")) {
+          lastError = `Endpoint ${endpoint} returned an HTML page instead of JSON API response.`;
+          console.warn(`[AgentRouter] ${lastError}`);
+          continue;
+        }
+        try {
+          const data = JSON.parse(responseText);
+          const content = data.choices?.[0]?.message?.content;
+          if (typeof content === "string" && content.trim()) {
+            return { text: content.trim() };
+          } else if (Array.isArray(content)) {
+            const textBlock = content.find((c: any) => c.type === "text" || c.text);
+            if (textBlock) return { text: (textBlock.text || textBlock.content || "").trim() };
+          }
+        } catch (parseErr) {
+          lastError = `Failed to parse JSON from ${endpoint}: ${parseErr}`;
+          console.warn(`[AgentRouter] ${lastError}`);
         }
       } else {
         const errText = await res.text().catch(() => "");
