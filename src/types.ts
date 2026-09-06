@@ -82,6 +82,7 @@ export interface UserProfile {
     voicePitch: number;
     formality: 'casual' | 'balanced' | 'formal';
     autoSpeak: boolean;
+    agentRouterKey?: string;
   };
   customInstructions: string;
   updatedAt: string;

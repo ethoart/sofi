@@ -166,39 +166,50 @@ export const SofiChat: React.FC<SofiChatProps> = ({
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
 
-    // Try to find pleasant female voices
+    // Try to find pleasant female voices with male rejection
     const voices = window.speechSynthesis.getVoices();
+    const femaleKeywords = [
+      "zira", "samantha", "karen", "victoria", "jenny", "aria", "susan", "eva",
+      "female", "natural", "catherine", "hazel", "heera", "moira", "fiona", "tessa",
+      "google uk english female", "google us english female", "serena", "alva", "clara",
+      "stephanie", "zoe", "allison", "ava", "siri"
+    ];
+
+    const maleKeywords = [
+      "david", "george", "mark", "james", "richard", "guy", "brian", "daniel",
+      "alex", "fred", "ralph", "oliver", "tom", "ravi", "male", "man", "boy",
+      "microsoft david", "microsoft george", "microsoft mark", "microsoft richard"
+    ];
+
     let pickedVoice: SpeechSynthesisVoice | undefined;
 
     if (language === "si") {
-      pickedVoice = voices.find(v => v.lang.includes("si") || v.lang.includes("LK"));
+      pickedVoice = voices.find(v => (v.lang.includes("si") || v.lang.includes("LK")) && !maleKeywords.some(m => v.name.toLowerCase().includes(m)));
     }
 
     if (!pickedVoice) {
-      pickedVoice = voices.find(v => {
-        const n = v.name.toLowerCase();
-        return (
-          n.includes("female") || 
-          n.includes("zira") || 
-          n.includes("samantha") || 
-          n.includes("karen") || 
-          n.includes("victoria") || 
-          n.includes("google uk english female") || 
-          n.includes("google us english female") || 
-          n.includes("jenny") || 
-          n.includes("aria") || 
-          n.includes("susan") ||
-          n.includes("eva")
-        ) && (v.lang.startsWith("en") || v.lang.startsWith("si"));
-      });
+      for (const kw of femaleKeywords) {
+        const match = voices.find(v => v.name.toLowerCase().includes(kw));
+        if (match) {
+          pickedVoice = match;
+          break;
+        }
+      }
     }
 
     if (!pickedVoice) {
-      pickedVoice = voices.find(v => v.lang.startsWith("en") && !v.name.toLowerCase().includes("male"));
+      pickedVoice = voices.find(v => 
+        (v.lang.startsWith("en") || v.lang.startsWith("si")) && 
+        !maleKeywords.some(m => v.name.toLowerCase().includes(m))
+      );
+    }
+
+    if (!pickedVoice && voices.length > 0) {
+      pickedVoice = voices.find(v => !maleKeywords.some(m => v.name.toLowerCase().includes(m))) || voices[0];
     }
 
     if (pickedVoice) utterance.voice = pickedVoice;
-    utterance.pitch = 1.15; // Natural feminine pitch
+    utterance.pitch = 1.25; // Distinctive sweet feminine pitch
 
     synthesisUtteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);

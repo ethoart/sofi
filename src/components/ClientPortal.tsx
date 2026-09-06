@@ -351,55 +351,97 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     }
   };
 
-  // Text-To-Speech with pleasant female voice selection
+  // Voice Initialization & Female Priority Selection
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+
+  const selectBestFemaleVoice = (voices: SpeechSynthesisVoice[], lang: "en" | "si"): SpeechSynthesisVoice | null => {
+    if (!voices || voices.length === 0) return null;
+
+    const femaleKeywords = [
+      "zira", "samantha", "karen", "victoria", "jenny", "aria", "susan", "eva",
+      "female", "natural", "catherine", "hazel", "heera", "moira", "fiona", "tessa",
+      "google uk english female", "google us english female", "serena", "alva", "clara",
+      "stephanie", "zoe", "allison", "ava", "siri"
+    ];
+
+    const maleKeywords = [
+      "david", "george", "mark", "james", "richard", "guy", "brian", "daniel",
+      "alex", "fred", "ralph", "oliver", "tom", "ravi", "male", "man", "boy",
+      "microsoft david", "microsoft george", "microsoft mark", "microsoft richard"
+    ];
+
+    // If Sinhala
+    if (lang === "si") {
+      const siMatch = voices.find(v => (v.lang.includes("si") || v.lang.includes("LK")) && !maleKeywords.some(m => v.name.toLowerCase().includes(m)));
+      if (siMatch) return siMatch;
+    }
+
+    // Direct female named match
+    for (const kw of femaleKeywords) {
+      const match = voices.find(v => v.name.toLowerCase().includes(kw));
+      if (match) return match;
+    }
+
+    // English voice that is NOT male
+    const nonMaleEn = voices.find(v => 
+      v.lang.startsWith("en") && !maleKeywords.some(m => v.name.toLowerCase().includes(m))
+    );
+    if (nonMaleEn) return nonMaleEn;
+
+    // General non-male
+    const nonMaleAny = voices.find(v => !maleKeywords.some(m => v.name.toLowerCase().includes(m)));
+    if (nonMaleAny) return nonMaleAny;
+
+    return voices[0] || null;
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && 'speechSynthesis' in window) {
+      const updateVoices = () => {
+        const v = window.speechSynthesis.getVoices();
+        if (v && v.length > 0) {
+          setAvailableVoices(v);
+          const femaleVoice = selectBestFemaleVoice(v, language);
+          if (femaleVoice) {
+            setSelectedVoice(femaleVoice);
+          }
+        }
+      };
+
+      updateVoices();
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+      return () => {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = null;
+        }
+      };
+    }
+  }, [language]);
+
+  // Text-To-Speech with guaranteed female voice selection and sweet pitch
   const speakText = (text: string) => {
     if (isMuted || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
 
     // Strip markdown code blocks before speaking
-    const cleanText = text.replace(/```[\s\S]*?```/g, "").replace(/[#*`_]/g, "").trim();
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/[#*`_~]/g, "")
+      .replace(/\[.*?\]\(.*?\)/g, "")
+      .trim();
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = language === "si" ? "si-LK" : "en-US";
     utterance.rate = userProfile?.preferences?.voiceSpeed || 1.0;
-    utterance.pitch = userProfile?.preferences?.voicePitch || 1.15; // Pleasant feminine pitch
+    utterance.pitch = userProfile?.preferences?.voicePitch || 1.25; // Distinctive sweet feminine tone
 
-    // Choose sweet female/girl voice across Windows, Mac, Android, ChromeOS
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      const voices = window.speechSynthesis.getVoices();
-      let pickedVoice: SpeechSynthesisVoice | undefined;
-
-      if (language === "si") {
-        pickedVoice = voices.find(v => v.lang.includes("si") || v.lang.includes("LK"));
-      }
-
-      if (!pickedVoice) {
-        pickedVoice = voices.find(v => {
-          const n = v.name.toLowerCase();
-          return (
-            n.includes("female") || 
-            n.includes("zira") || 
-            n.includes("samantha") || 
-            n.includes("karen") || 
-            n.includes("victoria") || 
-            n.includes("google uk english female") || 
-            n.includes("google us english female") || 
-            n.includes("jenny") || 
-            n.includes("aria") || 
-            n.includes("susan") ||
-            n.includes("eva")
-          ) && (v.lang.startsWith("en") || v.lang.startsWith("si"));
-        });
-      }
-
-      if (!pickedVoice) {
-        pickedVoice = voices.find(v => v.lang.startsWith("en") && !v.name.toLowerCase().includes("male") && !v.name.toLowerCase().includes("david") && !v.name.toLowerCase().includes("george"));
-      }
-
-      if (pickedVoice) {
-        utterance.voice = pickedVoice;
-      }
+    // Apply cached or detected female voice
+    const voices = window.speechSynthesis.getVoices();
+    const chosenVoice = selectedVoice || selectBestFemaleVoice(voices, language);
+    if (chosenVoice) {
+      utterance.voice = chosenVoice;
     }
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -408,6 +450,14 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
     synthesisUtteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
+  };
+
+  const handleTestFemaleVoice = () => {
+    setIsMuted(false);
+    const testPhrase = language === "si" 
+      ? "ආයුබෝවන්! මම සොෆී. මගේ ස්වභාවික කාන්තා හඬ දැන් සක්‍රියයි." 
+      : "Hello! I am Sofi. My natural female voice is now active and ready.";
+    speakText(testPhrase);
   };
 
   // Handle File Selection (Photos, Documents, PDF, Code)
@@ -526,7 +576,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           sessionId: activeSessionId,
           selectedModel,
           attachments: currentAttachments,
-          forceWebSearch: isWebSearchEnabled
+          forceWebSearch: isWebSearchEnabled,
+          userProfile
         })
       });
 
@@ -1382,6 +1433,18 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         language={language}
         currentEdition={sofiEdition}
         onSelectEdition={handleSelectEdition}
+        userProfile={userProfile || undefined}
+        onSaveUserProfile={async (updated) => {
+          const res = await fetch("/api/profile/user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updated)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setUserProfile(data.profile);
+          }
+        }}
         onOpenProfile={() => {
           setIsSettingsOpen(false);
           setIsProfileOpen(true);

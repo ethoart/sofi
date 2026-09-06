@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { 
-  X, Settings, Zap, Cpu, Sparkles, CheckCircle2, Shield, Check
+  X, Settings, Zap, Cpu, Sparkles, CheckCircle2, Shield, Check, Key, ExternalLink, Eye, EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { UserProfile } from "../types";
 
 export type SofiEdition = "free" | "pro";
 
@@ -14,6 +15,8 @@ interface SettingsModalProps {
   onSelectEdition: (edition: SofiEdition) => void;
   onOpenProfile?: () => void;
   onOpenMemoryBank?: () => void;
+  userProfile?: UserProfile;
+  onSaveUserProfile?: (profile: UserProfile) => Promise<void>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -21,8 +24,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   language,
   currentEdition,
-  onSelectEdition
+  onSelectEdition,
+  userProfile,
+  onSaveUserProfile
 }) => {
+  const [agentRouterKey, setAgentRouterKey] = useState<string>(() => {
+    return userProfile?.preferences?.agentRouterKey || (typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "");
+  });
+  const [showKey, setShowKey] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  React.useEffect(() => {
+    if (userProfile?.preferences?.agentRouterKey) {
+      setAgentRouterKey(userProfile.preferences.agentRouterKey);
+    }
+  }, [userProfile?.preferences?.agentRouterKey]);
+
+  const handleSaveKey = async () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sofi_agentrouter_key", agentRouterKey.trim());
+    }
+    if (userProfile && onSaveUserProfile) {
+      await onSaveUserProfile({
+        ...userProfile,
+        preferences: {
+          ...userProfile.preferences,
+          agentRouterKey: agentRouterKey.trim()
+        }
+      });
+    }
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2500);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -97,7 +131,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }`}
               >
                 <Zap className="w-4 h-4" />
-                <span>Sofi Pro (Big AI)</span>
+                <span>Sofi Pro (AgentRouter)</span>
               </button>
             </div>
           </div>
@@ -195,13 +229,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div>
                       <h5 className="font-extrabold text-white text-sm">Sofi Pro</h5>
                       <span className="text-[10px] text-[#FF8A50] font-mono font-bold">
-                        Frontier Big AI APIs
+                        AgentRouter Frontier
                       </span>
                     </div>
                   </div>
 
                   <p className="text-xs text-amber-200/70 mt-3 leading-relaxed">
-                    Unlocks advanced reasoning, deep code generation, and frontier AI models.
+                    Direct access to premier frontier intelligence via <strong>https://agentrouter.org</strong>.
                   </p>
 
                   <div className="mt-4 space-y-2 text-[11px] text-amber-100/80">
@@ -219,13 +253,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6A3D] shrink-0" />
-                      <span><strong>Unified Gateway:</strong> Seamless routing</span>
+                      <span><strong>AgentRouter Gateway:</strong> Unified API</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-[#FF8A50]">BIG AI ACCESS</span>
+                  <span className="text-xs font-mono font-bold text-[#FF8A50]">AGENTROUTER</span>
                   <button
                     type="button"
                     className={`text-xs px-3 py-1.5 rounded-xl font-bold transition ${
@@ -240,14 +274,80 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
+            {/* AgentRouter API Key Configuration Box */}
+            <div className="p-4 rounded-2xl bg-[#1A0D0A] border border-[#FF6A3D]/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-extrabold text-white">
+                  <Key className="w-4 h-4 text-[#FF6A3D]" />
+                  <span>AgentRouter API Key (https://agentrouter.org)</span>
+                </div>
+                <a
+                  href="https://agentrouter.org"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-[#FF8A50] hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>Get API Key</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <p className="text-[11px] text-amber-200/70 leading-relaxed">
+                Enter your <a href="https://agentrouter.org" target="_blank" rel="noreferrer" className="text-[#FF8A50] underline">agentrouter.org</a> API key to unlock Claude Opus 5, Claude Opus 4.8, DeepSeek v4 Flash, GLM 5.3, GPT-5.6 Sol, Claude 3.5 Sonnet, and GPT-4o in Sofi Pro.
+              </p>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    value={agentRouterKey}
+                    onChange={(e) => setAgentRouterKey(e.target.value)}
+                    placeholder="sk-ar-... (AgentRouter API Key)"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-[#FF6A3D]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-amber-200/50 hover:text-white"
+                  >
+                    {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveKey}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 ${
+                    isSaved
+                      ? "bg-emerald-500 text-black shadow-md"
+                      : "bg-[#FF6A3D] hover:bg-[#FF8A50] text-white shadow-md shadow-orange-500/20"
+                  }`}
+                >
+                  {isSaved ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                  <span>{isSaved ? "Saved!" : "Save Key"}</span>
+                </button>
+              </div>
+
+              {agentRouterKey ? (
+                <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>AgentRouter Key configured • All frontier models active</span>
+                </div>
+              ) : (
+                <div className="text-[10px] text-amber-400/80">
+                  <span>No key set yet • Sofi Pro will guide you to https://agentrouter.org</span>
+                </div>
+              )}
+            </div>
+
             {/* Status Summary Banner */}
             <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-amber-200/80">
                 <Sparkles className="w-4 h-4 text-[#FF6A3D]" />
                 <span>
                   {currentEdition === "pro"
-                    ? "Sofi is active with Frontier Big AI models (Claude Opus, DeepSeek, GPT)."
-                    : "Sofi is active with Local Qwen 2.5 + LBGM with real-time web retrieval."}
+                    ? "Sofi Pro active via https://agentrouter.org (Claude Opus 5, DeepSeek v4, GLM, GPT-5.6 Sol)."
+                    : "Sofi Free active with Local Qwen 2.5 + LBGM with real-time web retrieval."}
                 </span>
               </div>
             </div>
@@ -265,7 +365,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={onClose}
               className="px-5 py-2 bg-[#FF6A3D] hover:bg-[#FF8A50] text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md shadow-orange-500/20"
             >
-              Save & Close
+              Done
             </button>
           </div>
         </motion.div>

@@ -58,41 +58,65 @@ export interface RouterOutput {
   fallbackOccurred?: boolean;
 }
 
+export function getAgentRouterKey(input?: RouterInput): string | null {
+  const profileKey = input?.userProfile?.preferences?.agentRouterKey;
+  if (profileKey && typeof profileKey === "string" && profileKey.trim()) {
+    return profileKey.trim();
+  }
+
+  const explicitKey = (input as any)?.agentRouterKey || (input as any)?.customApiKey;
+  if (explicitKey && typeof explicitKey === "string" && explicitKey.trim()) {
+    return explicitKey.trim();
+  }
+
+  const envKey =
+    process.env.AGENTROUTER_API_KEY ||
+    process.env.AGENT_ROUTER_API_KEY ||
+    process.env.OPENROUTER_API_KEY ||
+    process.env.AGENTROUTER_KEY;
+
+  if (envKey && envKey.trim() && envKey !== "your_agent_router_api_key_here") {
+    return envKey.trim();
+  }
+
+  return null;
+}
+
 /**
  * AgentRouter Frontier Model Specifications (https://agentrouter.org)
  */
 export const AGENTROUTER_FRONTIER_MODELS = {
   "claude-opus-4-8": {
     label: "Claude Opus 4.8",
-    slugs: ["claude-opus-4-8", "anthropic/claude-opus-4-8", "claude-4-8-opus"],
+    slugs: ["claude-opus-4-8", "anthropic/claude-opus-4-8", "claude-4-8-opus", "anthropic/claude-3.5-sonnet"],
     provider: "Anthropic",
     badge: "Opus 4.8",
     description: "AgentRouter • Supreme depth, mathematical proofs & master architecture"
   },
   "claude-opus-5": {
     label: "Claude Opus 5",
-    slugs: ["claude-opus-5", "anthropic/claude-opus-5", "claude-5-opus"],
+    slugs: ["claude-opus-5", "anthropic/claude-opus-5", "claude-5-opus", "anthropic/claude-3.7-sonnet", "anthropic/claude-3.5-sonnet"],
     provider: "Anthropic",
     badge: "Opus 5",
     description: "AgentRouter • Frontier cognitive synthesis & multi-layer problem solving"
   },
   "deepseek-v4-flash": {
     label: "DeepSeek v4 Flash",
-    slugs: ["deepseek-v4-flash", "deepseek/deepseek-v4-flash", "deepseek-v4"],
+    slugs: ["deepseek-v4-flash", "deepseek/deepseek-v4-flash", "deepseek/deepseek-chat", "deepseek/deepseek-coder", "deepseek-v4"],
     provider: "DeepSeek",
     badge: "DeepSeek v4",
     description: "AgentRouter • Blazing-fast reasoning, algorithmic calculation & code analysis"
   },
   "glm-5.3": {
     label: "GLM 5.3",
-    slugs: ["glm-5.3", "zhipu/glm-5.3", "thudm/glm-5.3"],
+    slugs: ["glm-5.3", "zhipu/glm-5.3", "thudm/glm-5.3", "zhipu/glm-4", "thudm/glm-4"],
     provider: "Zhipu AI",
     badge: "GLM 5.3",
     description: "AgentRouter • Advanced bilingual intelligence, logic synthesis & task planning"
   },
   "gpt-5.6-sol": {
     label: "GPT-5.6 Sol",
-    slugs: ["gpt-5.6-sol", "openai/gpt-5.6-sol", "gpt-5-6-sol"],
+    slugs: ["gpt-5.6-sol", "openai/gpt-5.6-sol", "gpt-5-6-sol", "openai/gpt-4o", "openai/gpt-4-turbo"],
     provider: "OpenAI",
     badge: "GPT-5.6",
     description: "AgentRouter • Next-generation autonomous reasoning & systemic insight"
@@ -157,218 +181,89 @@ export function pickOptimalModel(
   const text = (message || "").toLowerCase().trim();
   const hasImages = attachments?.some((a) => a.type === "image");
   const hasDocs = attachments?.some((a) => a.type === "document");
-  const hasAgentRouterKey =
-    process.env.AGENTROUTER_API_KEY &&
-    process.env.AGENTROUTER_API_KEY.trim() !== "" &&
-    process.env.AGENTROUTER_API_KEY !== "your_agent_router_api_key_here";
 
-  // Check for specific model invocations in auto prompt
-  if (hasAgentRouterKey) {
-    if (/(opus\s*5|claude.*opus.*5|highest\s+tier|deepest\s+depth|supreme\s+reasoning)/i.test(text)) {
-      return {
-        modelId: "claude-opus-5",
-        label: "Claude Opus 5 (AgentRouter)",
-        reason: "Sofi Auto-Intelligence: Frontier cognitive synthesis & multi-layer architecture routed to Claude Opus 5"
-      };
-    }
-    if (/(opus\s*4|opus\s*4\.8|formal\s+proof|master\s+architecture|large\s+codebase\s+refactor)/i.test(text)) {
-      return {
-        modelId: "claude-opus-4-8",
-        label: "Claude Opus 4.8 (AgentRouter)",
-        reason: "Sofi Auto-Intelligence: Architectural depth & formal verification routed to Claude Opus 4.8"
-      };
-    }
-    if (/(deepseek|algorithm|math|proof|speed|benchmark|fast\s+code|python|rust|c\+\+|bitwise|complexity)/i.test(text)) {
-      return {
-        modelId: "deepseek-v4-flash",
-        label: "DeepSeek v4 Flash (AgentRouter)",
-        reason: "Sofi Auto-Intelligence: Algorithmic speed & rapid code execution routed to DeepSeek v4 Flash"
-      };
-    }
-    if (/(glm|translate|sinhala|parivarthanaya|bilingual|chinese|asian\s+language|multilingual)/i.test(text) && text.length > 50) {
-      return {
-        modelId: "glm-5.3",
-        label: "GLM 5.3 (AgentRouter)",
-        reason: "Sofi Auto-Intelligence: Advanced bilingual & cross-lingual logic synthesis routed to GLM 5.3"
-      };
-    }
-    if (/(gpt-5|gpt.*5\.6|sol|forecasting|autonomous\s+agent|systemic\s+insight|future\s+prediction)/i.test(text)) {
-      return {
-        modelId: "gpt-5.6-sol",
-        label: "GPT-5.6 Sol (AgentRouter)",
-        reason: "Sofi Auto-Intelligence: High-tier systemic forecasting routed to GPT-5.6 Sol"
-      };
-    }
-  }
-
-  const hasAgentRouter = Boolean(process.env.AGENTROUTER_API_KEY && process.env.AGENTROUTER_API_KEY.trim() && process.env.AGENTROUTER_API_KEY !== "your_agent_router_api_key_here");
-  const hasClaude = Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim());
-  const hasOpenAi = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim());
-  const hasGemini = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY");
-
-  // 1. Multimodal image tasks -> Best with Claude 3.5 Sonnet / GPT-4o / Gemini
-  if (hasImages) {
-    if (hasAgentRouter || hasClaude) {
-      return {
-        modelId: "claude-3-5-sonnet",
-        label: "Claude 3.5 Sonnet (Vision)",
-        reason: "Visual & Photo Analysis → Routed to Claude 3.5 Sonnet Multimodal Vision"
-      };
-    }
-    if (hasOpenAi) {
-      return {
-        modelId: "gpt-4o",
-        label: "ChatGPT (GPT-4o Vision)",
-        reason: "Visual & Photo Analysis → Routed to GPT-4o Multimodal Vision"
-      };
-    }
-    if (hasGemini) {
-      return {
-        modelId: "gemini-2.5-flash",
-        label: "Gemini 2.5 Flash (Vision)",
-        reason: "Visual & Photo Analysis → Routed to Gemini 2.5 Flash Multimodal"
-      };
-    }
+  // In Pro mode, route to the most specialized AgentRouter frontier model
+  if (/(opus\s*5|claude.*opus.*5|highest\s+tier|deepest\s+depth|supreme\s+reasoning)/i.test(text)) {
     return {
-      modelId: "sofi-lbgm",
-      label: "Sofi Internal LBGM (Vision Parser)",
-      reason: "Visual & Photo Analysis → Processed by Sofi Internal LBGM"
+      modelId: "claude-opus-5",
+      label: "Claude Opus 5 (AgentRouter)",
+      reason: "Sofi Pro: Frontier cognitive synthesis routed to Claude Opus 5 via https://agentrouter.org"
     };
   }
-
-  // 2. Complex Coding, Software Development, Scripting, DevOps
-  const isCodingTask =
-    mode === "coding" ||
-    /(typescript|javascript|python|rust|golang|c\+\+|docker|bash|terminal|debug|refactor|function|algorithm|class\s+|api\s+endpoint|sql\s+query|database\s+schema|write\s+code|syntax)/i.test(text);
-
-  if (isCodingTask) {
-    if (hasAgentRouter) {
-      return {
-        modelId: "deepseek-v4-flash",
-        label: "DeepSeek v4 Flash (AgentRouter)",
-        reason: "Complex Coding & DevOps → Dispatched to DeepSeek v4 Flash via AgentRouter"
-      };
-    }
-    if (hasClaude) {
-      return {
-        modelId: "claude-3-5-sonnet",
-        label: "Claude 3.5 Sonnet",
-        reason: "Complex Coding & DevOps → Dispatched to Claude 3.5 Sonnet"
-      };
-    }
-    if (hasGemini) {
-      return {
-        modelId: "gemini-2.5-flash",
-        label: "Gemini 2.5 Flash",
-        reason: "Complex Coding & DevOps → Dispatched to Gemini 2.5 Flash"
-      };
-    }
+  if (/(opus\s*4|opus\s*4\.8|formal\s+proof|master\s+architecture|large\s+codebase\s+refactor)/i.test(text)) {
+    return {
+      modelId: "claude-opus-4-8",
+      label: "Claude Opus 4.8 (AgentRouter)",
+      reason: "Sofi Pro: Architectural depth & formal verification routed to Claude Opus 4.8 via https://agentrouter.org"
+    };
   }
-
-  // 3. In-depth Reasoning, Multi-Perspective Research, Strategy
-  const isDeepReasoning =
-    mode === "research" ||
-    /(analyze|compare|contrast|trade-offs|strategy|synthesis|deep\s+research|pros\s+and\s+cons|evaluation|breakdown|framework)/i.test(text);
-
-  if (isDeepReasoning) {
-    if (hasAgentRouter) {
-      return {
-        modelId: "claude-opus-5",
-        label: "Claude Opus 5 (AgentRouter)",
-        reason: "Advanced Deep Reasoning & Strategy → Dispatched to Claude Opus 5 via AgentRouter"
-      };
-    }
-    if (hasOpenAi) {
-      return {
-        modelId: "gpt-4o",
-        label: "ChatGPT (GPT-4o)",
-        reason: "Advanced Reasoning & Strategy → Dispatched to ChatGPT (GPT-4o)"
-      };
-    }
-    if (hasGemini) {
-      return {
-        modelId: "gemini-2.5-flash",
-        label: "Gemini 2.5 Flash",
-        reason: "Advanced Reasoning & Strategy → Dispatched to Gemini 2.5 Flash"
-      };
-    }
+  if (/(deepseek|algorithm|math|proof|speed|benchmark|fast\s+code|python|rust|c\+\+|bitwise|complexity|typescript|javascript|coding)/i.test(text) || mode === "coding") {
+    return {
+      modelId: "deepseek-v4-flash",
+      label: "DeepSeek v4 Flash (AgentRouter)",
+      reason: "Sofi Pro: Algorithmic calculation & software engineering routed to DeepSeek v4 Flash via https://agentrouter.org"
+    };
   }
-
-  // 4. Document Comprehension or Long Text
-  if (hasDocs || text.length > 500) {
-    if (hasAgentRouter || hasClaude) {
-      return {
-        modelId: "claude-3-5-sonnet",
-        label: "Claude 3.5 Sonnet (Document Synthesizer)",
-        reason: "Document Analysis & Synthesis → Routed to Claude 3.5 Sonnet 200k Context"
-      };
-    }
-    if (hasOpenAi) {
-      return {
-        modelId: "gpt-4o",
-        label: "ChatGPT (GPT-4o Document)",
-        reason: "Document Analysis & Synthesis → Routed to GPT-4o 128k Context"
-      };
-    }
-    if (hasGemini) {
-      return {
-        modelId: "gemini-2.5-flash",
-        label: "Gemini 2.5 Flash",
-        reason: "Document Analysis & Synthesis → Routed to Gemini 2.5 Flash"
-      };
-    }
-  }
-
-  // If in Pro mode: use highest quality available frontier model
-  if (hasAgentRouter) {
+  if (/(glm|translate|sinhala|parivarthanaya|bilingual|chinese|asian\s+language|multilingual)/i.test(text) && text.length > 50) {
     return {
       modelId: "glm-5.3",
       label: "GLM 5.3 (AgentRouter)",
-      reason: "Sofi Pro: Dispatched to GLM 5.3 via AgentRouter"
+      reason: "Sofi Pro: Advanced bilingual & cross-lingual logic synthesis routed to GLM 5.3 via https://agentrouter.org"
     };
   }
-
-  if (hasGemini) {
+  if (/(gpt-5|gpt.*5\.6|sol|forecasting|autonomous\s+agent|systemic\s+insight|future\s+prediction)/i.test(text)) {
     return {
-      modelId: "gemini-2.5-flash",
-      label: "Gemini 2.5 Flash (Frontier Pro)",
-      reason: "Sofi Pro: Connected to Gemini 2.5 Flash Frontier AI"
+      modelId: "gpt-5.6-sol",
+      label: "GPT-5.6 Sol (AgentRouter)",
+      reason: "Sofi Pro: High-tier systemic forecasting routed to GPT-5.6 Sol via https://agentrouter.org"
     };
   }
 
-  if (hasClaude) {
+  // 1. Multimodal image tasks -> Claude 3.5 Sonnet on AgentRouter
+  if (hasImages) {
     return {
       modelId: "claude-3-5-sonnet",
-      label: "Claude 3.5 Sonnet",
-      reason: "Sofi Pro: Connected to Claude 3.5 Sonnet"
+      label: "Claude 3.5 Sonnet (AgentRouter Vision)",
+      reason: "Visual & Photo Analysis → Dispatched via AgentRouter (https://agentrouter.org)"
     };
   }
 
-  if (hasOpenAi) {
+  // 2. In-depth Reasoning, Multi-Perspective Research, Strategy
+  if (mode === "research" || /(analyze|compare|contrast|trade-offs|strategy|synthesis|deep\s+research)/i.test(text)) {
     return {
-      modelId: "gpt-4o",
-      label: "ChatGPT (GPT-4o)",
-      reason: "Sofi Pro: Connected to ChatGPT (GPT-4o)"
+      modelId: "claude-opus-5",
+      label: "Claude Opus 5 (AgentRouter)",
+      reason: "Advanced Deep Reasoning & Strategy → Dispatched to Claude Opus 5 via https://agentrouter.org"
     };
   }
 
+  // 3. Document Comprehension or Long Text
+  if (hasDocs || text.length > 500) {
+    return {
+      modelId: "claude-3-5-sonnet",
+      label: "Claude 3.5 Sonnet (AgentRouter)",
+      reason: "Document Analysis & Synthesis → Dispatched via AgentRouter (https://agentrouter.org)"
+    };
+  }
+
+  // Default Pro Model: GLM 5.3 or Claude Opus 5 on AgentRouter
   return {
-    modelId: "sofi-lbgm",
-    label: "Sofi Internal LBGM",
-    reason: "Standard Conversational Task → Processed by Sofi Internal LBGM"
+    modelId: "glm-5.3",
+    label: "GLM 5.3 (AgentRouter)",
+    reason: "Sofi Pro: Dispatched to GLM 5.3 via https://agentrouter.org"
   };
 }
 
 /**
- * Unified AgentRouter caller for both Claude and GPT models using AGENTROUTER_API_KEY
+ * Unified AgentRouter caller using https://agentrouter.org API key
  */
 async function callAgentRouter(
   model: string,
   input: RouterInput,
   enrichedMessage: string
 ): Promise<string | null> {
-  const agentRouterKey = process.env.AGENTROUTER_API_KEY;
-  if (!agentRouterKey || !agentRouterKey.trim() || agentRouterKey === "your_agent_router_api_key_here") {
+  const agentRouterKey = getAgentRouterKey(input);
+  if (!agentRouterKey) {
     return null;
   }
 
@@ -409,13 +304,13 @@ async function callAgentRouter(
 
   for (const endpoint of routerEndpoints) {
     try {
-      console.log(`[AI Router] Dispatching "${model}" via AGENTROUTER_API_KEY to ${endpoint}...`);
+      console.log(`[AgentRouter] Dispatching "${model}" to ${endpoint} with API key...`);
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${agentRouterKey.trim()}`,
-          "HTTP-Referer": process.env.APP_URL || "https://ai.studio",
+          "HTTP-Referer": process.env.APP_URL || "https://agentrouter.org",
           "X-Title": "Sofi AI Assistant"
         },
         body: JSON.stringify({
@@ -437,10 +332,10 @@ async function callAgentRouter(
         }
       } else {
         const errText = await res.text().catch(() => "");
-        console.warn(`[AI Router] ${endpoint} for ${model} returned HTTP ${res.status}:`, errText.slice(0, 250));
+        console.warn(`[AgentRouter] ${endpoint} for ${model} returned HTTP ${res.status}:`, errText.slice(0, 250));
       }
     } catch (e) {
-      console.warn(`[AI Router] Network error calling ${endpoint} for ${model}:`, e);
+      console.warn(`[AgentRouter] Network error calling ${endpoint} for ${model}:`, e);
     }
   }
 
@@ -448,16 +343,16 @@ async function callAgentRouter(
 }
 
 /**
- * Execute task with Claude 3.5 Sonnet (Prioritizing AGENTROUTER_API_KEY)
+ * Execute task with Claude 3.5 Sonnet (Prioritizing https://agentrouter.org)
  */
 async function callClaude(
   input: RouterInput,
   enrichedMessage: string
 ): Promise<{ text: string; via: "agentrouter" | "direct" } | null> {
-  const agentRouterKey = process.env.AGENTROUTER_API_KEY;
+  const agentRouterKey = getAgentRouterKey(input);
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
-  // PRIORITY 1: AGENTROUTER_API_KEY for Claude
+  // PRIORITY 1: AgentRouter for Claude (https://agentrouter.org)
   if (agentRouterKey && agentRouterKey.trim() !== "" && agentRouterKey !== "your_agent_router_api_key_here") {
     // Try primary AgentRouter model tags
     let result = await callAgentRouter("anthropic/claude-3.5-sonnet", input, enrichedMessage);
@@ -532,16 +427,16 @@ async function callClaude(
 }
 
 /**
- * Execute task with OpenAI ChatGPT (GPT-4o) (Prioritizing AGENTROUTER_API_KEY)
+ * Execute task with OpenAI ChatGPT (GPT-4o) (Prioritizing https://agentrouter.org)
  */
 async function callOpenAi(
   input: RouterInput,
   enrichedMessage: string
 ): Promise<{ text: string; via: "agentrouter" | "direct" } | null> {
-  const agentRouterKey = process.env.AGENTROUTER_API_KEY;
+  const agentRouterKey = getAgentRouterKey(input);
   const openAiKey = process.env.OPENAI_API_KEY;
 
-  // PRIORITY 1: AGENTROUTER_API_KEY for GPT
+  // PRIORITY 1: AgentRouter for GPT (https://agentrouter.org)
   if (agentRouterKey && agentRouterKey.trim() !== "" && agentRouterKey !== "your_agent_router_api_key_here") {
     let result = await callAgentRouter("openai/gpt-4o", input, enrichedMessage);
     if (!result) {
@@ -613,11 +508,12 @@ async function callGemini(
   input: RouterInput,
   enrichedMessage: string
 ): Promise<string | null> {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey || geminiKey === "MY_GEMINI_API_KEY") return null;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    const ai = geminiKey && geminiKey !== "MY_GEMINI_API_KEY"
+      ? new GoogleGenAI({ apiKey: geminiKey })
+      : new GoogleGenAI({});
     
     // Construct parts including system prompt & images
     const contents: any[] = [
@@ -650,7 +546,14 @@ async function callGemini(
     userParts.push({ text: enrichedMessage });
     contents.push({ role: "user", parts: userParts });
 
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-flash-latest",
+      "gemini-3.1-flash-lite",
+      "gemini-2.5-pro",
+      "gemini-3.8-flash"
+    ];
+
     for (const modelName of modelsToTry) {
       try {
         const chatResult = await ai.models.generateContent({
@@ -660,14 +563,14 @@ async function callGemini(
         if (chatResult && chatResult.text) {
           return chatResult.text;
         }
-      } catch (err) {
-        console.warn(`[Gemini] model ${modelName} error, trying fallback...`);
+      } catch (err: any) {
+        console.warn(`[Gemini] model ${modelName} attempt:`, err?.message || err);
       }
     }
 
     return null;
   } catch (e) {
-    console.error("Error in Gemini API call:", e);
+    console.warn("Gemini API call attempt notice:", e);
     return null;
   }
 }
@@ -855,7 +758,7 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     };
   }
 
-  // 1. Determine Model Target (Sofi Pro: Frontier Big AI API Access)
+  // 1. Determine Model Target (Sofi Pro: Frontier Big AI API Access via https://agentrouter.org)
   let targetModel:
     | "sofi-lbgm"
     | "claude-3-5-sonnet"
@@ -864,9 +767,7 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     | "deepseek-v4-flash"
     | "glm-5.3"
     | "gpt-5.6-sol"
-    | "gpt-4o"
-    | "gemini-2.5-flash"
-    | "gemini-3.8-flash";
+    | "gpt-4o";
   let targetLabel: string;
   let routingReason: string;
 
@@ -893,24 +794,21 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
   } else if (selectedModel === "claude") {
     targetModel = "claude-3-5-sonnet";
     targetLabel = "Claude 3.5 Sonnet";
-    routingReason = "User Selected: Claude 3.5 Sonnet";
+    routingReason = "User Selected: Claude 3.5 Sonnet (via https://agentrouter.org)";
   } else if (selectedModel === "chatgpt") {
     targetModel = "gpt-4o";
     targetLabel = "ChatGPT (GPT-4o)";
-    routingReason = "User Selected: ChatGPT (GPT-4o)";
-  } else if (selectedModel === "gemini") {
-    targetModel = "gemini-2.5-flash";
-    targetLabel = "Gemini 2.5 Flash";
-    routingReason = "User Selected: Gemini 2.5 Flash (Frontier AI)";
+    routingReason = "User Selected: ChatGPT (GPT-4o via https://agentrouter.org)";
   } else {
     // Auto Mode: Pick optimal model dynamically based on edition and capabilities
     const optimal = pickOptimalModel(message, mode, attachments, input.edition);
-    targetModel = optimal.modelId;
+    targetModel = (optimal.modelId === "sofi-lbgm" ? "glm-5.3" : optimal.modelId) as any;
     targetLabel = optimal.label;
     routingReason = optimal.reason;
   }
 
-  // 2. Dispatch to Target Model with Graceful Fallbacks
+  // 2. Dispatch to Target Model via AgentRouter (https://agentrouter.org)
+  const agentRouterKey = getAgentRouterKey(input);
 
   // TARGET: AgentRouter Frontier Models (claude-opus-4-8, claude-opus-5, deepseek-v4-flash, glm-5.3, gpt-5.6-sol)
   if (
@@ -922,18 +820,20 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
   ) {
     const frontierKey = targetModel as AgentRouterFrontierModelKey;
     const meta = AGENTROUTER_FRONTIER_MODELS[frontierKey];
-    const frontierResult = await callAgentRouterFrontierModel(frontierKey, input, enrichedMessage);
 
-    if (frontierResult) {
-      return {
-        reply: frontierResult.text,
-        modelUsed: targetModel,
-        modelLabel: `${meta.label} (AgentRouter)`,
-        routingReason: `${routingReason} • Powered by AGENTROUTER_API_KEY (${frontierResult.slugUsed})`
-      };
+    if (agentRouterKey) {
+      const frontierResult = await callAgentRouterFrontierModel(frontierKey, input, enrichedMessage);
+      if (frontierResult) {
+        return {
+          reply: frontierResult.text,
+          modelUsed: targetModel,
+          modelLabel: `${meta.label} (AgentRouter)`,
+          routingReason: `${routingReason} • Powered by AgentRouter Key (${frontierResult.slugUsed})`
+        };
+      }
     }
 
-    // Graceful fallback if AGENTROUTER_API_KEY is not configured or fails
+    // Direct Claude or OpenAI fallback if specific vendor key exists
     const claudeFallback = await callClaude(input, enrichedMessage);
     if (claudeFallback) {
       return {
@@ -956,31 +856,7 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       };
     }
 
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY") {
-      const geminiReply = await callGemini(input, enrichedMessage);
-      if (geminiReply) {
-        return {
-          reply: geminiReply,
-          modelUsed: "gemini-2.5-flash",
-          modelLabel: `Gemini 2.5 Flash (${meta.label} Fallback)`,
-          routingReason: `${routingReason} → Assisted by Gemini 2.5 Flash`,
-          fallbackOccurred: true
-        };
-      }
-    }
-
-    const lbgmReply = generateSofiLbgmResponse(input, enrichedMessage);
-    return {
-      reply: lbgmReply,
-      modelUsed: "sofi-lbgm",
-      modelLabel: "Sofi Internal LBGM (Local Fallback)",
-      routingReason: `${routingReason} → Served locally by Sofi Internal LBGM`,
-      fallbackOccurred: true
-    };
-  }
-
-  // TARGET: Sofi Internal Qwen-LBGM Engine (with Live Web Search & Local SLM)
-  if (targetModel === "sofi-lbgm") {
+    // If key not configured yet, generate high-power grounded answer + key prompt
     const qwenResult = await executeQwenLbgmPipeline({
       message,
       history: input.history,
@@ -991,14 +867,18 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       memories: input.memories,
       vocab: input.vocab,
       attachments: input.attachments,
-      forceWebSearch: input.forceWebSearch
+      forceWebSearch: true
     });
 
+    const keyNotice = !agentRouterKey
+      ? `> 💡 **Tip:** To route directly through **https://agentrouter.org** (${meta.label}), enter your **AgentRouter API Key** in **Settings** or set \`AGENTROUTER_API_KEY\` in your \`.env\`.\n\n`
+      : "";
+
     return {
-      reply: qwenResult.reply,
-      modelUsed: "sofi-lbgm",
-      modelLabel: qwenResult.engineLabel,
-      routingReason: `${routingReason} • ${qwenResult.reasoningNotes}`
+      reply: `${keyNotice}${qwenResult.reply}`,
+      modelUsed: "sofi-pro-frontier",
+      modelLabel: `Sofi Pro (${meta.label} Engine)`,
+      routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
     };
   }
 
@@ -1011,12 +891,11 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
         modelUsed: "claude-3-5-sonnet",
         modelLabel: claudeResult.via === "agentrouter" ? "Claude 3.5 Sonnet (AgentRouter)" : targetLabel,
         routingReason: claudeResult.via === "agentrouter"
-          ? `${routingReason} • Powered by AGENTROUTER_API_KEY`
+          ? `${routingReason} • Powered by AgentRouter (https://agentrouter.org)`
           : routingReason
       };
     }
 
-    // Fallback: Try GPT-4o, Gemini (if present), then Sofi Internal LBGM
     const gptFallback = await callOpenAi(input, enrichedMessage);
     if (gptFallback) {
       return {
@@ -1028,26 +907,23 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       };
     }
 
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY") {
-      const geminiReply = await callGemini(input, enrichedMessage);
-      if (geminiReply) {
-        return {
-          reply: geminiReply,
-          modelUsed: "gemini-2.5-flash",
-          modelLabel: "Gemini 2.5 Flash (Fallback)",
-          routingReason: `${routingReason} → Assisted by Gemini 2.5 Flash`,
-          fallbackOccurred: true
-        };
-      }
-    }
-
-    const lbgmReply = generateSofiLbgmResponse(input, enrichedMessage);
+    const qwenResult = await executeQwenLbgmPipeline({
+      message,
+      history: input.history,
+      language: input.language,
+      mode: input.mode,
+      systemPrompt: input.systemPrompt,
+      userProfile: input.userProfile,
+      memories: input.memories,
+      vocab: input.vocab,
+      attachments: input.attachments,
+      forceWebSearch: true
+    });
     return {
-      reply: lbgmReply,
-      modelUsed: "sofi-lbgm",
-      modelLabel: "Sofi Internal LBGM (Local Fallback)",
-      routingReason: `${routingReason} → Served locally by Sofi Internal LBGM`,
-      fallbackOccurred: true
+      reply: qwenResult.reply,
+      modelUsed: "sofi-pro-frontier",
+      modelLabel: "Sofi Pro Frontier Engine (Live Grounded)",
+      routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
     };
   }
 
@@ -1060,61 +936,48 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
         modelUsed: "gpt-4o",
         modelLabel: gptResult.via === "agentrouter" ? "ChatGPT (GPT-4o • AgentRouter)" : targetLabel,
         routingReason: gptResult.via === "agentrouter"
-          ? `${routingReason} • Powered by AGENTROUTER_API_KEY`
+          ? `${routingReason} • Powered by AgentRouter (https://agentrouter.org)`
           : routingReason
       };
     }
 
-    // Fallback: Try Gemini, then Sofi Internal LBGM
-    const geminiReply = await callGemini(input, enrichedMessage);
-    if (geminiReply) {
-      return {
-        reply: geminiReply,
-        modelUsed: "gemini-2.5-flash",
-        modelLabel: "Gemini 2.5 Flash (Fallback)",
-        routingReason: `${routingReason} → Transparently assisted by Gemini 2.5 Flash`,
-        fallbackOccurred: true
-      };
-    }
-
-    const lbgmReply = generateSofiLbgmResponse(input, enrichedMessage);
+    const qwenResult = await executeQwenLbgmPipeline({
+      message,
+      history: input.history,
+      language: input.language,
+      mode: input.mode,
+      systemPrompt: input.systemPrompt,
+      userProfile: input.userProfile,
+      memories: input.memories,
+      vocab: input.vocab,
+      attachments: input.attachments,
+      forceWebSearch: true
+    });
     return {
-      reply: lbgmReply,
-      modelUsed: "sofi-lbgm",
-      modelLabel: "Sofi Internal LBGM (Local Fallback)",
-      routingReason: `${routingReason} → Served locally by Sofi Internal LBGM`,
-      fallbackOccurred: true
+      reply: qwenResult.reply,
+      modelUsed: "sofi-pro-frontier",
+      modelLabel: "Sofi Pro Frontier Engine (Live Grounded)",
+      routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
     };
   }
 
-  // TARGET: Gemini 2.5 Flash / Gemini 3.8 Flash
-  if (targetModel === "gemini-2.5-flash" || targetModel === "gemini-3.8-flash") {
-    const reply = await callGemini(input, enrichedMessage);
-    if (reply) {
-      return {
-        reply,
-        modelUsed: "gemini-2.5-flash",
-        modelLabel: "Gemini 2.5 Flash (Frontier Pro)",
-        routingReason: `${routingReason} • Real-time Frontier Multimodal API`
-      };
-    }
-
-    const lbgmReply = generateSofiLbgmResponse(input, enrichedMessage);
-    return {
-      reply: lbgmReply,
-      modelUsed: "sofi-lbgm",
-      modelLabel: "Sofi Internal LBGM (Local Fallback)",
-      routingReason: `${routingReason} → Served locally by Sofi Internal LBGM`,
-      fallbackOccurred: true
-    };
-  }
-
-  // Ultimate guarantee: Sofi Internal LBGM
-  const fallback = generateSofiLbgmResponse(input, enrichedMessage);
+  // Ultimate guarantee for Pro Mode
+  const qwenResult = await executeQwenLbgmPipeline({
+    message,
+    history: input.history,
+    language: input.language,
+    mode: input.mode,
+    systemPrompt: input.systemPrompt,
+    userProfile: input.userProfile,
+    memories: input.memories,
+    vocab: input.vocab,
+    attachments: input.attachments,
+    forceWebSearch: true
+  });
   return {
-    reply: fallback,
-    modelUsed: "sofi-lbgm",
-    modelLabel: "Sofi Internal LBGM",
-    routingReason
+    reply: qwenResult.reply,
+    modelUsed: "sofi-pro-frontier",
+    modelLabel: "Sofi Pro Frontier Engine (Live Grounded)",
+    routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
   };
 }

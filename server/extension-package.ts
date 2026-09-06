@@ -1133,17 +1133,19 @@ function appendMessage(sender, text, meta = {}) {
 
     const speakBtn = document.createElement("button");
     speakBtn.className = "mini-action-btn";
-    speakBtn.innerHTML = "🔊 Speak";
+    speakBtn.innerHTML = "🔊 Speak (Female)";
     speakBtn.onclick = () => {
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text.replace(/<[^>]*>?/gm, ''));
-        utter.pitch = 1.15;
+        utter.pitch = 1.25;
         const voices = window.speechSynthesis.getVoices();
-        const femaleVoice = voices.find(v => {
-          const n = v.name.toLowerCase();
-          return n.includes("female") || n.includes("zira") || n.includes("samantha") || n.includes("karen") || n.includes("jenny");
-        });
+        const femaleKws = ["zira", "samantha", "karen", "victoria", "jenny", "aria", "susan", "eva", "female", "natural"];
+        const maleKws = ["david", "george", "mark", "james", "richard", "guy", "male"];
+        let femaleVoice = voices.find(v => femaleKws.some(k => v.name.toLowerCase().includes(k)));
+        if (!femaleVoice) {
+          femaleVoice = voices.find(v => !maleKws.some(m => v.name.toLowerCase().includes(m)));
+        }
         if (femaleVoice) utter.voice = femaleVoice;
         window.speechSynthesis.speak(utter);
       }
