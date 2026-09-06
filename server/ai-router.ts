@@ -308,7 +308,19 @@ async function callAgentRouter(
       
       // Check for explicit auth errors (401, 403)
       if (res.status === 401 || res.status === 403) {
-        return { error: `HTTP ${res.status} Authorization Error from ${endpoint}: Please check if your AgentRouter API key is valid.` };
+        const maskedKey = agentRouterKey.length > 12 
+          ? `${agentRouterKey.slice(0, 8)}...${agentRouterKey.slice(-4)}` 
+          : "******";
+        let providerMsg = responseText.slice(0, 200);
+        try {
+          const parsed = JSON.parse(responseText);
+          if (parsed.msg) providerMsg = parsed.msg;
+          else if (parsed.error?.message) providerMsg = parsed.error.message;
+        } catch (_) {}
+
+        return { 
+          error: `HTTP ${res.status} from ${endpoint}: "${providerMsg}".\nThe key sent was: ${maskedKey}. AgentRouter rejected this key as invalid.` 
+        };
       }
 
       if (res.ok) {
