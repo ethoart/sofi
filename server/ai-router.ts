@@ -126,27 +126,6 @@ export const AGENTROUTER_FRONTIER_MODELS = {
 export type AgentRouterFrontierModelKey = keyof typeof AGENTROUTER_FRONTIER_MODELS;
 
 /**
- * Call one of the AgentRouter frontier models with multiple fallback slugs
- */
-export async function callAgentRouterFrontierModel(
-  modelKey: AgentRouterFrontierModelKey,
-  input: RouterInput,
-  enrichedMessage: string
-): Promise<{ text: string; slugUsed: string } | null> {
-  const meta = AGENTROUTER_FRONTIER_MODELS[modelKey];
-  if (!meta) return null;
-
-  for (const slug of meta.slugs) {
-    const text = await callAgentRouter(slug, input, enrichedMessage);
-    if (text) {
-      return { text, slugUsed: slug };
-    }
-  }
-
-  return null;
-}
-
-/**
  * Determine the optimal model if mode is "auto"
  */
 export function pickOptimalModel(
@@ -261,10 +240,10 @@ async function callAgentRouter(
   model: string,
   input: RouterInput,
   enrichedMessage: string
-): Promise<string | null> {
+): Promise<{ text?: string; error?: string }> {
   const agentRouterKey = getAgentRouterKey(input);
   if (!agentRouterKey) {
-    return null;
+    return { error: "AgentRouter API key is not configured. Please set AGENTROUTER_API_KEY in your .env or Settings." };
   }
 
   // Format messages
@@ -302,6 +281,8 @@ async function callAgentRouter(
     "https://openrouter.ai/api/v1/chat/completions"
   ];
 
+  let lastError = "";
+
   for (const endpoint of routerEndpoints) {
     try {
       console.log(`[AgentRouter] Dispatching "${model}" to ${endpoint} with API key...`);
@@ -325,26 +306,49 @@ async function callAgentRouter(
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content;
         if (typeof content === "string" && content.trim()) {
-          return content.trim();
+          return { text: content.trim() };
         } else if (Array.isArray(content)) {
           const textBlock = content.find((c: any) => c.type === "text" || c.text);
-          if (textBlock) return (textBlock.text || textBlock.content || "").trim();
+          if (textBlock) return { text: (textBlock.text || textBlock.content || "").trim() };
         }
       } else {
         const errText = await res.text().catch(() => "");
-        console.warn(`[AgentRouter] ${endpoint} for ${model} returned HTTP ${res.status}:`, errText.slice(0, 250));
+        lastError = `HTTP ${res.status} from ${endpoint}: ${errText.slice(0, 300)}`;
+        console.warn(`[AgentRouter] ${endpoint} for ${model} returned ${lastError}`);
       }
-    } catch (e) {
-      console.warn(`[AgentRouter] Network error calling ${endpoint} for ${model}:`, e);
+    } catch (e: any) {
+      lastError = `Network error connecting to ${endpoint}: ${e?.message || e}`;
+      console.warn(`[AgentRouter] ${lastError}`);
     }
   }
 
-  return null;
+  return { error: lastError || "Failed to reach AgentRouter endpoints." };
 }
 
 /**
- * Execute task with Claude 3.5 Sonnet (Prioritizing https://agentrouter.org)
+ * Call one of the AgentRouter frontier models with multiple fallback slugs and return exact errors
  */
+export async function callAgentRouterFrontierModel(
+  modelKey: AgentRouterFrontierModelKey,
+  input: RouterInput,
+  enrichedMessage: string
+): Promise<{ text?: string; slugUsed?: string; error?: string }> {
+  const meta = AGENTROUTER_FRONTIER_MODELS[modelKey];
+  if (!meta) return { error: `Invalid frontier model key: ${modelKey}` };
+
+  let lastError = "";
+  for (const slug of meta.slugs) {
+    const res = await callAgentRouter(slug, input, enrichedMessage);
+    if (res.text) {
+      return { text: res.text, slugUsed: slug };
+    }
+    if (res.error) {
+      lastError = res.error;
+    }
+  }
+
+  return { error: lastError || `Failed to execute ${meta.label} via AgentRouter endpoints.` };
+}
 async function callClaude(
   input: RouterInput,
   enrichedMessage: string
@@ -356,11 +360,11 @@ async function callClaude(
   if (agentRouterKey && agentRouterKey.trim() !== "" && agentRouterKey !== "your_agent_router_api_key_here") {
     // Try primary AgentRouter model tags
     let result = await callAgentRouter("anthropic/claude-3.5-sonnet", input, enrichedMessage);
-    if (!result) {
+    if (!result.text) {
       result = await callAgentRouter("claude-3-5-sonnet-20241022", input, enrichedMessage);
     }
-    if (result) {
-      return { text: result, via: "agentrouter" };
+    if (result.text) {
+      return { text: result.text, via: "agentrouter" };
     }
   }
 
@@ -439,11 +443,11 @@ async function callOpenAi(
   // PRIORITY 1: AgentRouter for GPT (https://agentrouter.org)
   if (agentRouterKey && agentRouterKey.trim() !== "" && agentRouterKey !== "your_agent_router_api_key_here") {
     let result = await callAgentRouter("openai/gpt-4o", input, enrichedMessage);
-    if (!result) {
+    if (!result.text) {
       result = await callAgentRouter("gpt-4o", input, enrichedMessage);
     }
-    if (result) {
-      return { text: result, via: "agentrouter" };
+    if (result.text) {
+      return { text: result.text, via: "agentrouter" };
     }
   }
 
@@ -982,69 +986,45 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
     const frontierKey = targetModel as AgentRouterFrontierModelKey;
     const meta = AGENTROUTER_FRONTIER_MODELS[frontierKey];
 
-    if (agentRouterKey) {
-      const frontierResult = await callAgentRouterFrontierModel(frontierKey, input, enrichedMessage);
-      if (frontierResult) {
-        return {
-          reply: frontierResult.text,
-          modelUsed: targetModel,
-          modelLabel: `${meta.label} (AgentRouter)`,
-          routingReason: `${routingReason} • Powered by AgentRouter Key (${frontierResult.slugUsed})`
-        };
-      }
-    }
-
-    // Direct Claude or OpenAI fallback if specific vendor key exists
-    const claudeFallback = await callClaude(input, enrichedMessage);
-    if (claudeFallback) {
+    if (!agentRouterKey) {
       return {
-        reply: claudeFallback.text,
-        modelUsed: "claude-3-5-sonnet",
-        modelLabel: `Claude 3.5 Sonnet (${meta.label} Fallback)`,
-        routingReason: `${routingReason} → Assisted by Claude 3.5 Sonnet`,
-        fallbackOccurred: true
+        reply: `⚠️ **AgentRouter API Key Missing**\n\nTo use **${meta.label}** via [agentrouter.org](https://agentrouter.org), please set your valid \`AGENTROUTER_API_KEY\` in your \`.env\` file or in Settings.\n\n*Note: Local fallback has been disabled per your request.*`,
+        modelUsed: targetModel,
+        modelLabel: `${meta.label} (Key Required)`,
+        routingReason: `${routingReason} • Missing API Key`
       };
     }
 
-    const openAiFallback = await callOpenAi(input, enrichedMessage);
-    if (openAiFallback) {
+    const frontierResult = await callAgentRouterFrontierModel(frontierKey, input, enrichedMessage);
+    if (frontierResult.text) {
       return {
-        reply: openAiFallback.text,
-        modelUsed: "gpt-4o",
-        modelLabel: `ChatGPT GPT-4o (${meta.label} Fallback)`,
-        routingReason: `${routingReason} → Assisted by ChatGPT (GPT-4o)`,
-        fallbackOccurred: true
+        reply: frontierResult.text,
+        modelUsed: targetModel,
+        modelLabel: `${meta.label} (AgentRouter)`,
+        routingReason: `${routingReason} • Powered by AgentRouter Key (${frontierResult.slugUsed})`
       };
     }
 
-    // If key not configured yet, generate high-power grounded answer + key prompt
-    const qwenResult = await executeQwenLbgmPipeline({
-      message,
-      history: input.history,
-      language: input.language,
-      mode: input.mode,
-      systemPrompt: input.systemPrompt,
-      userProfile: input.userProfile,
-      memories: input.memories,
-      vocab: input.vocab,
-      attachments: input.attachments,
-      forceWebSearch: true
-    });
-
-    const keyNotice = !agentRouterKey
-      ? `> 💡 **Tip:** To route directly through **https://agentrouter.org** (${meta.label}), enter your **AgentRouter API Key** in **Settings** or set \`AGENTROUTER_API_KEY\` in your \`.env\`.\n\n`
-      : "";
-
+    // If call failed, return the exact API error instead of falling back local
     return {
-      reply: `${keyNotice}${qwenResult.reply}`,
-      modelUsed: "sofi-pro-frontier",
-      modelLabel: `Sofi Pro (${meta.label} Engine)`,
-      routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
+      reply: `⚠️ **AgentRouter API Error (${meta.label})**\n\nFailed to connect or authenticate with [agentrouter.org](https://agentrouter.org).\n\n**Error Details:**\n\`\`\`text\n${frontierResult.error || "Unknown error from agentrouter.org"}\n\`\`\`\n\nPlease check your API key, account balance, or internet connection.`,
+      modelUsed: targetModel,
+      modelLabel: `${meta.label} (API Error)`,
+      routingReason: `${routingReason} • AgentRouter API Call Failed`
     };
   }
 
   // TARGET: Claude 3.5 Sonnet
   if (targetModel === "claude-3-5-sonnet") {
+    if (!agentRouterKey) {
+      return {
+        reply: `⚠️ **AgentRouter API Key Missing**\n\nTo use **Claude 3.5 Sonnet** via [agentrouter.org](https://agentrouter.org), please set your valid \`AGENTROUTER_API_KEY\` in your \`.env\` file or in Settings.\n\n*Note: Local fallback has been disabled per your request.*`,
+        modelUsed: targetModel,
+        modelLabel: `Claude 3.5 Sonnet (Key Required)`,
+        routingReason: `${routingReason} • Missing API Key`
+      };
+    }
+
     const claudeResult = await callClaude(input, enrichedMessage);
     if (claudeResult) {
       return {
@@ -1057,39 +1037,25 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       };
     }
 
-    const gptFallback = await callOpenAi(input, enrichedMessage);
-    if (gptFallback) {
-      return {
-        reply: gptFallback.text,
-        modelUsed: "gpt-4o",
-        modelLabel: "ChatGPT (GPT-4o Fallback)",
-        routingReason: `${routingReason} → Assisted by ChatGPT (GPT-4o)`,
-        fallbackOccurred: true
-      };
-    }
-
-    const qwenResult = await executeQwenLbgmPipeline({
-      message,
-      history: input.history,
-      language: input.language,
-      mode: input.mode,
-      systemPrompt: input.systemPrompt,
-      userProfile: input.userProfile,
-      memories: input.memories,
-      vocab: input.vocab,
-      attachments: input.attachments,
-      forceWebSearch: true
-    });
     return {
-      reply: qwenResult.reply,
-      modelUsed: "sofi-pro-frontier",
-      modelLabel: "Sofi Pro Frontier Engine (Live Grounded)",
-      routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
+      reply: `⚠️ **AgentRouter API Error (Claude 3.5 Sonnet)**\n\nFailed to connect or authenticate with [agentrouter.org](https://agentrouter.org).\n\nPlease check your API key, account balance, or internet connection.`,
+      modelUsed: targetModel,
+      modelLabel: `Claude 3.5 Sonnet (API Error)`,
+      routingReason: `${routingReason} • AgentRouter API Call Failed`
     };
   }
 
   // TARGET: ChatGPT (GPT-4o)
   if (targetModel === "gpt-4o") {
+    if (!agentRouterKey) {
+      return {
+        reply: `⚠️ **AgentRouter API Key Missing**\n\nTo use **ChatGPT (GPT-4o)** via [agentrouter.org](https://agentrouter.org), please set your valid \`AGENTROUTER_API_KEY\` in your \`.env\` file or in Settings.\n\n*Note: Local fallback has been disabled per your request.*`,
+        modelUsed: targetModel,
+        modelLabel: `ChatGPT (Key Required)`,
+        routingReason: `${routingReason} • Missing API Key`
+      };
+    }
+
     const gptResult = await callOpenAi(input, enrichedMessage);
     if (gptResult) {
       return {
@@ -1102,23 +1068,11 @@ export async function dispatchMultiModelPrompt(input: RouterInput): Promise<Rout
       };
     }
 
-    const qwenResult = await executeQwenLbgmPipeline({
-      message,
-      history: input.history,
-      language: input.language,
-      mode: input.mode,
-      systemPrompt: input.systemPrompt,
-      userProfile: input.userProfile,
-      memories: input.memories,
-      vocab: input.vocab,
-      attachments: input.attachments,
-      forceWebSearch: true
-    });
     return {
-      reply: qwenResult.reply,
-      modelUsed: "sofi-pro-frontier",
-      modelLabel: "Sofi Pro Frontier Engine (Live Grounded)",
-      routingReason: `${routingReason} • Live Web Intelligence & Pro Deep Synthesis`
+      reply: `⚠️ **AgentRouter API Error (ChatGPT GPT-4o)**\n\nFailed to connect or authenticate with [agentrouter.org](https://agentrouter.org).\n\nPlease check your API key, account balance, or internet connection.`,
+      modelUsed: targetModel,
+      modelLabel: `ChatGPT (API Error)`,
+      routingReason: `${routingReason} • AgentRouter API Call Failed`
     };
   }
 
