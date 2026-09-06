@@ -275,10 +275,9 @@ async function callAgentRouter(
     formattedMessages.push({ role: "user", content: enrichedMessage });
   }
 
-  // Supported endpoints for AgentRouter OpenAI-compatible gateway
+  // Primary AgentRouter endpoint
   const routerEndpoints = [
-    "https://agentrouter.org/v1/chat/completions",
-    "https://openrouter.ai/api/v1/chat/completions"
+    "https://agentrouter.org/v1/chat/completions"
   ];
 
   let lastError = "";
