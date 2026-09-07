@@ -935,14 +935,14 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               </button>
             </div>
 
-            {/* Mobile App APK Download Button (Requested with QR code) */}
+            {/* Mobile App Download Button (Requested with QR code) */}
             <button
               onClick={() => setIsApkModalOpen(true)}
               className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#FF6A3D]/10 hover:bg-[#FF6A3D]/20 text-[#FF8A50] border border-[#FF6A3D]/30 rounded-xl text-xs font-bold transition cursor-pointer"
-              title="Download Mobile App APK via QR Code"
+              title="Download & Install Mobile App via QR Code"
             >
               <Smartphone className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">APK</span>
+              <span className="hidden sm:inline">Download App</span>
               <QrCode className="w-3 h-3 text-[#FF8A50]" />
             </button>
 
