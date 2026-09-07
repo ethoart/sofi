@@ -651,29 +651,39 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
 
                     {/* Direct Action Buttons */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <a
-                        href="/api/android/download"
-                        download="sofi-assistant-v1.2.apk"
-                        className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Download APK (14.8 MB)</span>
-                      </a>
-
                       <button
                         type="button"
-                        onClick={handleRunAndroidBuild}
-                        disabled={isBuilding}
+                        onClick={async () => {
+                          const deferred = (window as any).deferredPwaPrompt;
+                          if (deferred) {
+                            deferred.prompt();
+                            const choice = await deferred.userChoice;
+                            if (choice.outcome === "accepted") {
+                              alert("Sofi AI Assistant installed successfully on your Android device!");
+                            }
+                          } else {
+                            window.location.href = "/api/android/download";
+                          }
+                        }}
+                        className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        <span>Install Android App (1-Tap)</span>
+                      </button>
+
+                      <a
+                        href="/api/android/download?file=raw"
+                        download="sofi-assistant-v1.2.apk"
                         className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FF6A3D]/30 text-amber-200 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <Cpu className={`w-4 h-4 text-emerald-400 ${isBuilding ? "animate-spin" : ""}`} />
-                        <span>{isBuilding ? "Building on Server..." : "Run Gradle Script"}</span>
-                      </button>
+                        <Download className="w-4 h-4 text-amber-400" />
+                        <span>Download Raw Zip</span>
+                      </a>
                     </div>
 
                     <div className="bg-[#24120D] border border-amber-500/20 rounded-2xl p-3 text-xs text-amber-200/80">
                       <p className="text-[11px] leading-relaxed">
-                        <strong className="text-white">Note for Android 15:</strong> Android 15 requires compiled AXML binary manifests. If your device shows "problem parsing package", use the <strong>Instant App</strong> tab above which installs via Chrome without any parsing errors!
+                        <strong className="text-white">Android 9–15 Compatibility:</strong> Modern Android devices use Google WebAPK engine to compile and install native standalone apps directly. Tap <strong>"Install Android App"</strong> above to launch Sofi as a native Android app in your app drawer without parse errors!
                       </p>
                     </div>
                   </div>

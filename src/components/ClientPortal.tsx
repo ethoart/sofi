@@ -574,6 +574,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         matchedModel = "auto";
       } else if (mention === "gemini") {
         matchedModel = "gemini";
+      } else if (mention === "banana" || mention === "nanobanana" || mention === "imagen") {
+        matchedModel = "gemini";
       } else if (mention === "gpt" || mention === "chatgpt" || mention === "gpt-4o") {
         matchedModel = "chatgpt";
       } else if (mention === "claude" || mention === "sonnet" || mention === "claude-3-5") {
@@ -865,7 +867,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   }`}
                   title={`Click to switch between Free and Pro (Currently: ${sofiEdition.toUpperCase()})`}
                 >
-                  <span>{sofiEdition === "pro" ? "✨ Pro Active" : "⚡ Free Active"}</span>
+                  <span>{sofiEdition === "pro" ? "Pro Active" : "Free Active"}</span>
                   <span className="text-[8.5px] opacity-80 underline">Switch</span>
                 </button>
                 <button
@@ -1298,13 +1300,14 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               </button>
             </div>
 
-            {/* Model @ Mention Auto-suggest list displayed only when typing "@" */}
-            {sofiEdition === "pro" && inputText.includes("@") && (
+            {/* Model @ Mention Auto-suggest list displayed when typing "@" */}
+            {inputText.includes("@") && (
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-1 px-1 no-scrollbar bg-[#120706] p-2 rounded-2xl border border-white/10 shadow-lg animate-in fade-in duration-200">
                 <span className="text-[10px] font-mono text-[#FF8A50] shrink-0 font-bold uppercase tracking-wider mr-1">
                   Mention AI Model:
                 </span>
                 {[
+                  { tag: "@banana", name: "Nano Banana (Imagen 3)", shortcut: "banana" },
                   { tag: "@auto", name: "Auto Router", shortcut: "auto" },
                   { tag: "@gemini", name: "Gemini", shortcut: "gemini" },
                   { tag: "@gpt", name: "ChatGPT 4o", shortcut: "gpt" },
