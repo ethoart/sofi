@@ -1,0 +1,54 @@
+Manifest-Version: 1.0
+Created-By: 1.0 (Sofi Build Pipeline)
+
+Name: AndroidManifest.xml
+SHA-256-Digest: /kMqAflcoJJztQkQT1KAkbAyllYBRgdq4UnS+gTsnms=
+
+Name: assets/public/assets/
+SHA-256-Digest: 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
+
+Name: assets/public/assets/aistudio/
+SHA-256-Digest: 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
+
+Name: assets/public/assets/aistudio/.gitignore
+SHA-256-Digest: zbyuFRBda3geYggTx5x+hodA1OnMU85vX8u8Ejh630s=
+
+Name: assets/public/assets/index-BqqXGnjb.css
+SHA-256-Digest: cPVQoBlOkgaNSCkKobZun21gri9yZu+qJk8N6mL4qbQ=
+
+Name: assets/public/assets/index-CVNAQb5Y.js
+SHA-256-Digest: tzXkh+yld4IXtlXai1PQZK7Fc2KXPkMZmJNUc3MqYDQ=
+
+Name: assets/public/assets/sofi_chibi_sticker_1788496148780-Pxb3VUbe.jpg
+SHA-256-Digest: hJfDCiCI4NSdNfuypL1Blf61P9bbYhhUMTUkHdKAxpc=
+
+Name: assets/public/index.html
+SHA-256-Digest: 2PPeynYP7fubTvW/nGwlxFyTi7vcThH6VuDEu7PCfnE=
+
+Name: assets/public/server.cjs
+SHA-256-Digest: DW6mflKvk3bBxwIulsPBLq1hopcDRTfAIR+XaSg/bbo=
+
+Name: assets/public/server.cjs.map
+SHA-256-Digest: kC6zf2MsfWTkKl+I6qdBUlKp810ARKru2RuFmtkDVDU=
+
+Name: assets/public/sofi-chibi.png
+SHA-256-Digest: hJfDCiCI4NSdNfuypL1Blf61P9bbYhhUMTUkHdKAxpc=
+
+Name: assets/public/sofi-logo.jpg
+SHA-256-Digest: hJfDCiCI4NSdNfuypL1Blf61P9bbYhhUMTUkHdKAxpc=
+
+Name: assets/sofi-package.json
+SHA-256-Digest: Hqif5BUXw7Lt+zhz3gx8BPq+zOMiosRW3ph3TgXwjEs=
+
+Name: classes.dex
+SHA-256-Digest: QrV+4CiQjXf2LeYnunajNR+d5d9OGMIqOQLDNk4w3D8=
+
+Name: res/mipmap-xxxhdpi/ic_launcher.png
+SHA-256-Digest: hJfDCiCI4NSdNfuypL1Blf61P9bbYhhUMTUkHdKAxpc=
+
+Name: res/mipmap-xxxhdpi/ic_launcher_round.png
+SHA-256-Digest: hJfDCiCI4NSdNfuypL1Blf61P9bbYhhUMTUkHdKAxpc=
+
+Name: resources.arsc
+SHA-256-Digest: hU6LVcYFQiwAKM4SGNGdu750/hKxLpryVrK4dnJ+Pr0=
+

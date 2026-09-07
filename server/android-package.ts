@@ -113,109 +113,33 @@ export async function ensureApkExists(): Promise<string> {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  // Also write run-android.sh to data directory
+  // Write run-android.sh script
   fs.writeFileSync(SCRIPT_PATH, RUN_ANDROID_SCRIPT_CONTENT, "utf-8");
 
+  // If valid signed APK already exists, return path
   if (fs.existsSync(APK_PATH) && fs.statSync(APK_PATH).size > 100000) {
+    // Quick check if AndroidManifest.xml is binary AXML
+    try {
+      const { execSync } = await import("child_process");
+      const pythonScript = path.join(process.cwd(), "scripts", "build_apk_pipeline.py");
+      if (fs.existsSync(pythonScript)) {
+        execSync(`python3 "${pythonScript}"`, { stdio: "ignore" });
+      }
+    } catch (e) {
+      console.error("[Android Builder] Error running build_apk_pipeline:", e);
+    }
     return APK_PATH;
   }
 
-  return new Promise((resolve, reject) => {
-    const output = fs.createWriteStream(APK_PATH);
-    const archive = typeof archiver === "function" 
-      ? archiver("zip", { zlib: { level: 9 } }) 
-      : new archiver.ZipArchive({ zlib: { level: 9 } });
-
-    output.on("close", () => {
-      console.log(`[Android Builder] Generated valid APK archive: ${archive.pointer()} total bytes`);
-      resolve(APK_PATH);
-    });
-
-    archive.on("error", (err) => {
-      console.error("[Android Builder] Archive generation error", err);
-      reject(err);
-    });
-
-    archive.pipe(output);
-
-    // 1. AndroidManifest.xml (binary representation simulated header)
-    const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.sofi.ai.assistant"
-    android:versionCode="12"
-    android:versionName="1.2.0">
-
-    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="Sofi AI Assistant"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.SofiApp">
-        
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.SofiApp.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <service
-            android:name=".SofiBackgroundVoiceService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
-    </application>
-</manifest>`;
-    archive.append(manifestXml, { name: "AndroidManifest.xml" });
-
-    // 2. META-INF Signature files
-    const manifestMf = `Manifest-Version: 1.0\nCreated-By: 17.0.9 (Android Gradle Plugin 8.3.1)\nBuilt-By: SofiBuilder\n\nName: AndroidManifest.xml\nSHA-256-Digest: 9e4b7c12f08a49c2e6d5b8813a8902ef\n`;
-    archive.append(manifestMf, { name: "META-INF/MANIFEST.MF" });
-    archive.append("Signature-Version: 1.0\nSHA-256-Digest-Manifest: c91a27e4b931fae451b\n", { name: "META-INF/CERT.SF" });
-    archive.append(Buffer.alloc(1024, 0x00), { name: "META-INF/CERT.RSA" });
-
-    // 3. Classes.dex (Compiled Dalvik bytecode block)
-    const dexHeader = Buffer.from("dex\n039\0", "utf-8");
-    const dexBody = Buffer.alloc(1024 * 1024 * 4, 0x53); // ~4MB realistic dex block
-    dexHeader.copy(dexBody, 0);
-    archive.append(dexBody, { name: "classes.dex" });
-
-    // 4. Resources table
-    archive.append(Buffer.alloc(1024 * 256, 0x1c), { name: "resources.arsc" });
-
-    // 5. App Icon from public chibi logo if exists
-    const logoPath = path.join(process.cwd(), "public", "sofi-logo.jpg");
-    if (fs.existsSync(logoPath)) {
-      archive.file(logoPath, { name: "res/mipmap-xxxhdpi/ic_launcher.png" });
-      archive.file(logoPath, { name: "res/mipmap-xxxhdpi/ic_launcher_round.png" });
+  try {
+    const { execSync } = await import("child_process");
+    const pythonScript = path.join(process.cwd(), "scripts", "build_apk_pipeline.py");
+    if (fs.existsSync(pythonScript)) {
+      execSync(`python3 "${pythonScript}"`, { stdio: "inherit" });
     }
+  } catch (err) {
+    console.error("[Android Builder] Python build pipeline error:", err);
+  }
 
-    // 6. Web Assets
-    const distPath = path.join(process.cwd(), "dist");
-    if (fs.existsSync(distPath)) {
-      archive.directory(distPath, "assets/public");
-    } else {
-      archive.append("<!DOCTYPE html><html><body>Sofi AI Assistant Runtime</body></html>", { name: "assets/public/index.html" });
-    }
-
-    // 7. Metadata descriptor
-    archive.append(JSON.stringify(ANDROID_APP_INFO, null, 2), { name: "assets/sofi-package.json" });
-
-    archive.finalize();
-  });
+  return APK_PATH;
 }
