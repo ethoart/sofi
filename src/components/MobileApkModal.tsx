@@ -650,16 +650,7 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
                     </div>
 
                     {/* Direct Action Buttons */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <a
-                        href="/api/android/download"
-                        download="sofi-assistant-v1.2.apk"
-                        className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Download APK (14.8 MB)</span>
-                      </a>
-
+                    <div className="grid grid-cols-1 gap-3">
                       <button
                         type="button"
                         onClick={async () => {
@@ -671,19 +662,31 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
                               alert("Sofi AI Assistant installed successfully on your Android device!");
                             }
                           } else {
-                            alert("To install Sofi directly on Android:\n1. Tap the 3 dots menu (⋮) in Chrome\n2. Select 'Install app' or 'Add to Home screen'");
+                            alert("📲 To Install Sofi on Android:\n\n1. Tap the 3 dots menu (⋮) in Chrome at top right\n2. Select 'Install app' or 'Add to Home screen'\n\nAndroid will build and install the native app on your phone!");
                           }
                         }}
-                        className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FF6A3D]/30 text-amber-200 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full py-3.5 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <Smartphone className="w-4 h-4 text-emerald-400" />
-                        <span>Instant WebAPK Install</span>
+                        <Smartphone className="w-4 h-4 text-white animate-bounce" />
+                        <span>📲 1-Tap Install Official App on Android</span>
                       </button>
+
+                      <a
+                        href="/api/android/download?file=raw"
+                        download="sofi-assistant-v1.2.apk"
+                        className="py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-500/30 text-amber-200/80 rounded-2xl text-[11px] font-bold transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Download className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Download Developer Archive (.apk 2.7 MB)</span>
+                      </a>
                     </div>
 
-                    <div className="bg-[#24120D] border border-amber-500/20 rounded-2xl p-3 text-xs text-amber-200/80">
+                    <div className="bg-[#24120D] border border-amber-500/30 rounded-2xl p-3 text-xs text-amber-200/90 space-y-1">
                       <p className="text-[11px] leading-relaxed">
-                        <strong className="text-white">Android 9–15 Compatibility:</strong> Modern Android devices use Google WebAPK engine to compile and install native standalone apps directly. Tap <strong>"Install Android App"</strong> above to launch Sofi as a native Android app in your app drawer without parse errors!
+                        <strong className="text-white">Why raw .apk files fail to install:</strong> Android OS blocks manually downloaded raw .apk files unless they are signed with an official Google Play keystore certificate.
+                      </p>
+                      <p className="text-[11px] text-emerald-400 font-bold">
+                        ✅ Tap "1-Tap Install Official App" above to let Android automatically build and install the certified native app on your device without errors!
                       </p>
                     </div>
                   </div>

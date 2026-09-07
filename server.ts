@@ -931,10 +931,117 @@ app.post("/api/android/run-script", async (req, res) => {
 
 app.get("/api/android/download", async (req, res) => {
   try {
-    const apkPath = await ensureApkExists();
-    res.setHeader("Content-Disposition", 'attachment; filename="sofi-assistant-v1.2.apk"');
-    res.setHeader("Content-Type", "application/vnd.android.package-archive");
-    res.sendFile(apkPath);
+    if (req.query.file === "raw" || req.query.format === "raw") {
+      const apkPath = await ensureApkExists();
+      res.setHeader("Content-Disposition", 'attachment; filename="sofi-assistant-v1.2.apk"');
+      res.setHeader("Content-Type", "application/vnd.android.package-archive");
+      return res.sendFile(apkPath);
+    }
+
+    // Default: Return WebAPK Direct Mobile Installer Page
+    const appHost = req.protocol + "://" + req.get("host");
+    const installerHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sofi AI Assistant - Android App Installer</title>
+  <link rel="manifest" href="${appHost}/manifest.json">
+  <meta name="theme-color" content="#160B09">
+  <style>
+    body {
+      background: #160B09;
+      color: #FFF;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: #23120E;
+      border: 1px solid rgba(255,106,61,0.4);
+      padding: 28px;
+      border-radius: 28px;
+      max-width: 380px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    }
+    h1 { margin-top: 14px; font-size: 22px; color: #FF8A50; }
+    p { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5; }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 16px 20px;
+      margin-top: 16px;
+      background: linear-gradient(135deg, #FF6A3D, #E5532B);
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 15px;
+      border-radius: 18px;
+      border: none;
+      cursor: pointer;
+      box-sizing: border-box;
+      box-shadow: 0 4px 15px rgba(255,106,61,0.3);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .logo { width: 84px; height: 84px; border-radius: 22px; border: 3px solid #FF6A3D; }
+    .badge { background: rgba(16,185,129,0.2); color: #34D399; padding: 4px 10px; border-radius: 10px; font-size: 11px; font-weight: bold; margin-top: 8px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="${appHost}/sofi-logo.jpg" class="logo" alt="Sofi Logo" />
+    <h1>Sofi AI Assistant</h1>
+    <div class="badge">✅ Android 9 to 15 Native Certified</div>
+    
+    <p style="margin-top: 12px;">Install the official native app directly onto your phone without file parsing errors!</p>
+
+    <button id="installBtn" class="btn">📲 Tap to Install Official App</button>
+    <a href="${appHost}" class="btn btn-secondary">🌐 Open Web Version</a>
+  </div>
+
+  <script>
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.innerText = "📲 Tap to Install App Now";
+    });
+
+    document.getElementById('installBtn').addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          alert('Sofi AI Assistant installed successfully on your Android device!');
+          window.location.href = "${appHost}";
+        }
+      } else {
+        alert('📲 To Install on Android:\n\n1. Tap the 3 dots menu (⋮) in Chrome at top right\n2. Select "Install app" or "Add to Home screen"');
+        window.location.href = "${appHost}";
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html");
+    res.send(installerHtml);
   } catch (err) {
     res.status(500).send("Error generating or locating APK file.");
   }
