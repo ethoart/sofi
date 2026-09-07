@@ -563,6 +563,38 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       ? text 
       : (language === "si" ? "අමුණා ඇති ලේඛන / ඡායාරූප විශ්ලේෂණය කරන්න" : "Please analyze the attached document(s) / photo(s)");
 
+    // Parse model mention with @ in the message text
+    let activeModelToSend: SupportedAiModel = selectedModel;
+    const mentionRegex = /@(\w+[-.\w]*)/i;
+    const match = userMsgText.match(mentionRegex);
+    if (match) {
+      const mention = match[1].toLowerCase();
+      let matchedModel: SupportedAiModel | null = null;
+      if (mention === "auto" || mention === "autorouter") {
+        matchedModel = "auto";
+      } else if (mention === "gemini") {
+        matchedModel = "gemini";
+      } else if (mention === "gpt" || mention === "chatgpt" || mention === "gpt-4o") {
+        matchedModel = "chatgpt";
+      } else if (mention === "claude" || mention === "sonnet" || mention === "claude-3-5") {
+        matchedModel = "claude";
+      } else if (mention === "deepseek") {
+        matchedModel = "deepseek-v4-flash";
+      } else if (mention === "opus" || mention === "claude-opus") {
+        matchedModel = "claude-opus-5";
+      } else if (mention === "glm") {
+        matchedModel = "glm-5.3";
+      } else if (mention === "sol") {
+        matchedModel = "gpt-5.6-sol";
+      }
+
+      if (matchedModel) {
+        activeModelToSend = matchedModel;
+        // Temporarily highlight the model state locally
+        setSelectedModel(matchedModel);
+      }
+    }
+
     const userMsg: Message = {
       id: "msg-" + Date.now(),
       sender: "user",
@@ -589,10 +621,11 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           mode: activeMode,
           edition: sofiEdition,
           sessionId: activeSessionId,
-          selectedModel,
+          selectedModel: activeModelToSend,
           attachments: currentAttachments,
           forceWebSearch: isWebSearchEnabled,
           agentRouterKey: storedAgentRouterKey || userProfile?.preferences?.agentRouterKey,
+
           userProfile: {
             ...userProfile,
             preferences: {
@@ -1114,9 +1147,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                       {msg.modelUsed === "gpt-4o" && <span className="text-emerald-400 font-bold">💡</span>}
                       {msg.modelUsed === "gemini-3.8-flash" && <span className="text-sky-400 font-bold">✨</span>}
                       <span className="font-semibold text-white">{msg.modelLabel}</span>
-                      {msg.routingReason && (
-                        <span className="text-amber-200/50 hidden sm:inline">• {msg.routingReason}</span>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1268,37 +1298,35 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               </button>
             </div>
 
-            {/* Pro Frontier Model Selection Strip (User Choice + Prompt Command Supported) */}
-            {sofiEdition === "pro" && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 px-0.5 no-scrollbar">
-                <span className="text-[10px] font-mono text-amber-200/50 shrink-0 font-bold uppercase tracking-wider mr-1">
-                  Pro Model:
+            {/* Model @ Mention Auto-suggest list displayed only when typing "@" */}
+            {sofiEdition === "pro" && inputText.includes("@") && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-1 px-1 no-scrollbar bg-[#120706] p-2 rounded-2xl border border-white/10 shadow-lg animate-in fade-in duration-200">
+                <span className="text-[10px] font-mono text-[#FF8A50] shrink-0 font-bold uppercase tracking-wider mr-1">
+                  Mention AI Model:
                 </span>
                 {[
-                  { id: "auto", label: "⚡ Auto Router", shortcut: "auto" },
-                  { id: "gemini", label: "✨ Gemini 2.5 Flash", shortcut: "gemini" },
-                  { id: "chatgpt", label: "💡 ChatGPT (GPT-4o)", shortcut: "gpt" },
-                  { id: "claude", label: "🧠 Claude 3.5 Sonnet", shortcut: "claude" },
-                  { id: "deepseek-v4-flash", label: "🚀 DeepSeek v4", shortcut: "deepseek" },
-                  { id: "claude-opus-5", label: "👑 Claude Opus 5", shortcut: "opus" },
-                  { id: "glm-5.3", label: "🌐 GLM 5.3", shortcut: "glm" },
-                  { id: "gpt-5.6-sol", label: "☀️ GPT-5.6 Sol", shortcut: "sol" }
+                  { tag: "@auto", name: "Auto Router", shortcut: "auto" },
+                  { tag: "@gemini", name: "Gemini", shortcut: "gemini" },
+                  { tag: "@gpt", name: "ChatGPT 4o", shortcut: "gpt" },
+                  { tag: "@claude", name: "Claude 3.5", shortcut: "claude" },
+                  { tag: "@deepseek", name: "DeepSeek v4", shortcut: "deepseek" },
+                  { tag: "@opus", name: "Claude Opus 5", shortcut: "opus" },
+                  { tag: "@glm", name: "GLM 5.3", shortcut: "glm" },
+                  { tag: "@sol", name: "GPT-5.6 Sol", shortcut: "sol" }
                 ].map((m) => (
                   <button
-                    key={m.id}
+                    key={m.tag}
                     type="button"
-                    onClick={() => setSelectedModel(m.id as SupportedAiModel)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 border cursor-pointer ${
-                      selectedModel === m.id
-                        ? "bg-[#FF6A3D]/25 border-[#FF6A3D] text-white shadow-sm shadow-orange-500/20"
-                        : "bg-white/5 border-white/10 text-amber-200/60 hover:text-white hover:bg-white/10"
-                    }`}
-                    title={`Select ${m.label} or type "${m.shortcut} <prompt>" in input`}
+                    onClick={() => {
+                      const lastAtIdx = inputText.lastIndexOf("@");
+                      const prefix = inputText.substring(0, lastAtIdx);
+                      setInputText(prefix + m.tag + " ");
+                      chatInputRef.current?.focus();
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-xs font-bold bg-white/5 hover:bg-[#FF6A3D]/20 text-amber-200 border border-white/10 hover:border-[#FF6A3D] transition flex items-center gap-1 cursor-pointer shrink-0"
                   >
-                    <span>{m.label}</span>
-                    <span className="text-[9px] font-mono text-amber-200/40 bg-black/40 px-1 py-0.5 rounded">
-                      {m.shortcut}
-                    </span>
+                    <span className="text-[#FF8A50] font-mono">{m.tag}</span>
+                    <span className="text-[10px] text-white/50">({m.name})</span>
                   </button>
                 ))}
               </div>
@@ -1402,7 +1430,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
               </button>
 
-              <input
+               <input
                 ref={chatInputRef}
                 type="text"
                 value={inputText}
@@ -1414,31 +1442,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   }
                 }}
                 placeholder={
-                  selectedModel === "gemini"
-                    ? (language === "si" ? "Gemini 2.5 Flash වෙතින් අසන්න (උදා: 'gemini explain quantum physics')..." : "Ask with Gemini 2.5 Flash (Direct Cloud Inference)...")
-                    : selectedModel === "chatgpt"
-                    ? (language === "si" ? "ChatGPT (GPT-4o) වෙතින් අසන්න (උදා: 'gpt make website')..." : "Ask with ChatGPT (GPT-4o via AgentRouter)...")
-                    : selectedModel === "claude"
-                    ? (language === "si" ? "Claude 3.5 Sonnet වෙතින් අසන්න (උදා: 'claude write code')..." : "Ask with Claude 3.5 Sonnet (via AgentRouter)...")
-                    : selectedModel === "deepseek-v4-flash"
-                    ? (language === "si" ? "DeepSeek v4 Flash වෙතින් අසන්න (උදා: 'deepseek write api')..." : "Ask with DeepSeek v4 Flash (via AgentRouter)...")
-                    : selectedModel === "claude-opus-5"
-                    ? (language === "si" ? "Claude Opus 5 වෙතින් අසන්න (උදා: 'opus formulate theory')..." : "Ask with Claude Opus 5 (Frontier via AgentRouter)...")
-                    : selectedModel === "glm-5.3"
-                    ? (language === "si" ? "GLM 5.3 වෙතින් අසන්න (උදා: 'glm translate text')..." : "Ask with GLM 5.3 (via AgentRouter)...")
-                    : selectedModel === "gpt-5.6-sol"
-                    ? (language === "si" ? "GPT-5.6 Sol වෙතින් අසන්න (උදා: 'sol analyze system')..." : "Ask with GPT-5.6 Sol (via AgentRouter)...")
-                    : activeMode === "coding"
-                    ? (language === "si" ? "කේතනය හෝ DevOps අසන්න (උදා: 'gpt make website' හෝ 'deepseek ...')..." : "Ask coding question (try: 'gpt make website', 'deepseek ...', 'claude ...')...")
-                    : activeMode === "research"
-                    ? (language === "si" ? "ගැඹුරු පර්යේෂණයක් අසන්න (උදා: 'opus ...' හෝ 'gpt ...')..." : "Enter research inquiry (try: 'opus ...', 'gpt ...', 'claude ...')...")
-                    : stagedAttachments.length > 0
-                    ? `Ask about ${stagedAttachments.length} attached document/photo...`
-                    : activeMode === "creative"
-                    ? "Describe image or video prompt, or click '+' to open studio..."
-                    : language === "si"
-                    ? "සොෆීගෙන් ඕනෑම දෙයක් අසන්න (උදා: 'gpt make website' හෝ 'claude ...')..."
-                    : "Ask Sofi anything (try: 'gpt make website', 'claude ...', 'deepseek ...')..."
+                  sofiEdition === "pro"
+                    ? (language === "si" ? "සොෆීගෙන් අසන්න (trigger කිරීමට @gpt, @claude, @deepseek, @opus ඇතුළත් කරන්න)..." : "Ask Sofi Pro (Type @gpt, @claude, @deepseek, @opus to trigger specific AI)...")
+                    : (language === "si" ? "සොෆීගෙන් ඕනෑම දෙයක් අසන්න..." : "Ask Sofi anything...")
                 }
                 className="flex-1 bg-transparent text-xs sm:text-sm text-white px-2 focus:outline-none placeholder:text-amber-200/30 font-medium"
               />
