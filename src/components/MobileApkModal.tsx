@@ -651,6 +651,15 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
 
                     {/* Direct Action Buttons */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <a
+                        href="/api/android/download"
+                        download="sofi-assistant-v1.2.apk"
+                        className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download APK (14.8 MB)</span>
+                      </a>
+
                       <button
                         type="button"
                         onClick={async () => {
@@ -662,23 +671,14 @@ export const MobileApkModal: React.FC<MobileApkModalProps> = ({ isOpen, onClose,
                               alert("Sofi AI Assistant installed successfully on your Android device!");
                             }
                           } else {
-                            window.location.href = "/api/android/download";
+                            alert("To install Sofi directly on Android:\n1. Tap the 3 dots menu (⋮) in Chrome\n2. Select 'Install app' or 'Add to Home screen'");
                           }
                         }}
-                        className="py-3 px-4 bg-gradient-to-r from-[#FF6A3D] to-[#E5532B] hover:from-[#FF8A50] hover:to-[#FF6A3D] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                        <span>Install Android App (1-Tap)</span>
-                      </button>
-
-                      <a
-                        href="/api/android/download?file=raw"
-                        download="sofi-assistant-v1.2.apk"
                         className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FF6A3D]/30 text-amber-200 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <Download className="w-4 h-4 text-amber-400" />
-                        <span>Download Raw Zip</span>
-                      </a>
+                        <Smartphone className="w-4 h-4 text-emerald-400" />
+                        <span>Instant WebAPK Install</span>
+                      </button>
                     </div>
 
                     <div className="bg-[#24120D] border border-amber-500/20 rounded-2xl p-3 text-xs text-amber-200/80">
