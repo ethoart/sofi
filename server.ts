@@ -390,22 +390,38 @@ app.get("/api/mongodb/collection/:name", (req, res) => {
 
 app.get("/api/chats", (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
+  const guestSessionId = req.headers["x-guest-session-id"] as string;
   const payload = verifyUserToken(token);
-  const sessions = getChatSessions(payload?.userId);
+  const effectiveUserId = payload?.userId || guestSessionId;
+
+  if (!effectiveUserId) {
+    return res.json([]);
+  }
+  const sessions = getChatSessions(effectiveUserId);
   res.json(sessions);
 });
 
 app.post("/api/chats", (req, res) => {
-  const session = req.body;
-  if (!session || !session.id) {
-    return res.status(400).json({ error: "Session id is required" });
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  const guestSessionId = req.headers["x-guest-session-id"] as string;
+  const payload = verifyUserToken(token);
+  const effectiveUserId = payload?.userId || guestSessionId || req.body?.userId;
+
+  if (!effectiveUserId) {
+    return res.status(401).json({ error: "Private session key required." });
   }
-  const saved = saveChatSession(session);
+  const session = { ...req.body, userId: effectiveUserId };
+  const saved = saveChatSession(session, effectiveUserId);
   res.json({ success: true, session: saved });
 });
 
 app.delete("/api/chats/:id", (req, res) => {
-  deleteChatSession(req.params.id);
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  const guestSessionId = req.headers["x-guest-session-id"] as string;
+  const payload = verifyUserToken(token);
+  const effectiveUserId = payload?.userId || guestSessionId;
+
+  deleteChatSession(req.params.id, effectiveUserId);
   res.json({ success: true });
 });
 
@@ -1004,10 +1020,11 @@ app.get("/api/android/download", async (req, res) => {
     <h1>Sofi AI Assistant</h1>
     <div class="badge">✅ Android 9 to 15 Native Certified</div>
     
-    <p style="margin-top: 12px;">Install the official native app directly onto your phone without file parsing errors!</p>
+    <p style="margin-top: 12px;">Install the official app directly onto your phone (v1.2.0 • 2.7 MB):</p>
 
-    <button id="installBtn" class="btn">📲 Tap to Install Official App</button>
-    <a href="${appHost}" class="btn btn-secondary">🌐 Open Web Version</a>
+    <button id="installBtn" class="btn">📲 1-Tap Install (Recommended PWA/WebAPK)</button>
+    <a href="${appHost}/api/android/download?file=raw" class="btn btn-secondary" style="background: rgba(255,106,61,0.15); border-color: #FF6A3D; color: #FF8A50; font-weight: bold;">📦 Download raw APK File (2.7 MB)</a>
+    <a href="${appHost}" class="btn btn-secondary">🌐 Launch Web App</a>
   </div>
 
   <script>

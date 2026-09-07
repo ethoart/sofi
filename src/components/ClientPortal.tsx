@@ -136,6 +136,25 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       : `Hello${nameStr}! I am Sofi, your intelligent AI companion. I'm actively remembering your preferences, profile details, and historical interactions to assist you with precision. How can I help you today?`;
   };
 
+  // Generate persistent private session headers
+  const getAuthHeaders = (): Record<string, string> => {
+    let guestId = typeof window !== "undefined" ? localStorage.getItem("sofi_guest_session_id") : null;
+    if (!guestId) {
+      guestId = "sess_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sofi_guest_session_id", guestId);
+      }
+    }
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-guest-session-id": guestId
+    };
+    if (currentUser?.token) {
+      headers["Authorization"] = `Bearer ${currentUser.token}`;
+    }
+    return headers;
+  };
+
   // Fetch initial profiles, memories, and chat sessions
   const loadData = async () => {
     try {
@@ -145,7 +164,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         fetch("/api/memories").then(r => r.json()),
         fetch("/api/vocab").then(r => r.json()),
         fetch("/api/chats", {
-          headers: currentUser?.token ? { Authorization: `Bearer ${currentUser.token}` } : {}
+          headers: getAuthHeaders()
         }).then(r => r.json())
       ]);
       setUserProfile(uRes);
@@ -209,7 +228,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     // Save session to MongoDB
     fetch("/api/chats", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(newSession)
     }).catch(console.error);
 
@@ -232,7 +251,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/chats/${sessionId}`, { method: "DELETE" });
+      await fetch(`/api/chats/${sessionId}`, { method: "DELETE", headers: getAuthHeaders() });
       const updated = sessions.filter((s) => s.id !== sessionId);
       setSessions(updated);
       if (activeSessionId === sessionId) {
@@ -615,7 +634,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       const storedAgentRouterKey = typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "";
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           message: userMsgText,
           history: updatedMessages.slice(-8),
@@ -669,7 +688,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         };
         fetch("/api/chats", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(sessionPayload)
         }).catch(console.error);
 

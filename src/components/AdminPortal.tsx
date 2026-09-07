@@ -3,7 +3,7 @@ import {
   Terminal, ShieldCheck, Lock, LogOut, ArrowLeft, RefreshCw, Server, Cpu, HardDrive, 
   Activity, Play, CheckCircle2, AlertCircle, Sparkles, Layers, Smartphone, KeyRound, Database
 } from "lucide-react";
-import { CommandExecutionResult, ServerStatus } from "../types";
+import { CommandExecutionResult, ServerStatus, Skill, McpServer } from "../types";
 import { AwsCloudflareSetup } from "./AwsCloudflareSetup";
 import { McpTerminal } from "./McpTerminal";
 import { SkillLearner } from "./SkillLearner";
@@ -46,7 +46,67 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onExitToClient, langua
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // Verify stored token on mount
+  // MCP & Skills State
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+
+  // Fetch Skills and MCP servers
+  useEffect(() => {
+    if (!authToken) return;
+    
+    fetch("/api/skills")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setSkills(data);
+      })
+      .catch(console.error);
+
+    fetch("/api/mcp/servers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setMcpServers(data);
+      })
+      .catch(console.error);
+  }, [authToken]);
+
+  const handleAddSkill = async (newSkillData: any) => {
+    try {
+      const res = await fetch("/api/skills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSkillData)
+      });
+      const data = await res.json();
+      if (data.skill) {
+        setSkills((prev) => [data.skill, ...prev]);
+      }
+    } catch (err) {
+      console.error("Error adding skill:", err);
+    }
+  };
+
+  const handleDeleteSkill = async (id: string) => {
+    try {
+      await fetch(`/api/skills/${id}`, { method: "DELETE" });
+      setSkills((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error("Error deleting skill:", err);
+    }
+  };
+
+  const handleAddMcpServer = async (name: string, url: string) => {
+    const newServer: McpServer = {
+      id: "mcp-" + Date.now(),
+      name,
+      url,
+      status: "connected",
+      tools: [
+        { name: "system_ping", description: "Ping server host", inputSchema: {} },
+        { name: "fetch_metrics", description: "Fetch host health metrics", inputSchema: {} }
+      ]
+    };
+    setMcpServers((prev) => [...prev, newServer]);
+  };
   useEffect(() => {
     if (authToken) {
       fetch("/api/admin/verify", {
@@ -532,15 +592,29 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onExitToClient, langua
         )}
 
         {activeTab === "mcp" && (
-          <McpTerminal />
+          <McpTerminal
+            mcpServers={mcpServers}
+            onAddMcpServer={handleAddMcpServer}
+            serverStatus={serverStatus}
+            onRefreshStatus={() => {}}
+          />
         )}
 
         {activeTab === "skills" && (
-          <SkillLearner />
+          <SkillLearner
+            skills={skills}
+            onAddSkill={handleAddSkill}
+            onDeleteSkill={handleDeleteSkill}
+          />
         )}
 
         {activeTab === "android" && (
-          <MobileSimulator />
+          <MobileSimulator
+            language={language}
+            skills={skills}
+            onSkillTriggered={(skillName) => console.log("Skill triggered:", skillName)}
+            serverStatus={serverStatus}
+          />
         )}
       </div>
     </div>

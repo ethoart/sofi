@@ -330,25 +330,34 @@ export function createGuestUser() {
   };
 }
 
-// Chat Session CRUD
+// Chat Session CRUD (100% Private & Isolated per User / Session ID)
 export function getChatSessions(userId?: string) {
+  if (!userId) return [];
   const chats = readCollection("chats");
-  // Sort by updatedAt descending
   return chats
-    .filter((c) => !userId || c.userId === userId || c.userId === "user-default" || !c.userId)
+    .filter((c) => c.userId === userId)
     .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
 }
 
-export function saveChatSession(session: any) {
+export function saveChatSession(session: any, userId?: string) {
+  if (!session || !session.id) return null;
+  const targetUserId = userId || session.userId;
+  if (!targetUserId) return null;
+
   const chats = readCollection("chats");
   const index = chats.findIndex((c) => c.id === session.id);
   const updatedSession = {
     ...session,
+    userId: targetUserId,
     _id: session._id || generateObjectId(),
     updatedAt: new Date().toISOString()
   };
 
   if (index >= 0) {
+    // Security check: ensure session belongs to user
+    if (chats[index].userId && chats[index].userId !== targetUserId) {
+      return null;
+    }
     chats[index] = updatedSession;
   } else {
     chats.unshift(updatedSession);
@@ -358,9 +367,9 @@ export function saveChatSession(session: any) {
   return updatedSession;
 }
 
-export function deleteChatSession(sessionId: string) {
+export function deleteChatSession(sessionId: string, userId?: string) {
   const chats = readCollection("chats");
-  const filtered = chats.filter((c) => c.id !== sessionId);
+  const filtered = chats.filter((c) => c.id !== sessionId || (userId && c.userId !== userId));
   writeCollection("chats", filtered);
   return true;
 }

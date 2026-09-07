@@ -241,10 +241,16 @@ export const SofiChat: React.FC<SofiChatProps> = ({
 
     try {
       const storedKey = typeof window !== "undefined" ? localStorage.getItem("sofi_agentrouter_key") || "" : "";
+      let guestId = typeof window !== "undefined" ? localStorage.getItem("sofi_guest_session_id") : null;
+      if (!guestId) {
+        guestId = "sess_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
+        if (typeof window !== "undefined") localStorage.setItem("sofi_guest_session_id", guestId);
+      }
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "x-guest-session-id": guestId
         },
         body: JSON.stringify({
           message: text,
