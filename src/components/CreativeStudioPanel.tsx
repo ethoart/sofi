@@ -25,6 +25,7 @@ export const CreativeStudioPanel: React.FC<CreativeStudioPanelProps> = ({
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState<string>("1:1");
   const [selectedStyle, setSelectedStyle] = useState<string>("Anime / Manga Artwork");
+  const [selectedImageModel, setSelectedImageModel] = useState<string>("google/imagen-3");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedJobs, setGeneratedJobs] = useState<MediaJob[]>([]);
   const [activeJob, setActiveJob] = useState<MediaJob | null>(null);
@@ -74,7 +75,8 @@ export const CreativeStudioPanel: React.FC<CreativeStudioPanelProps> = ({
           type: mediaType,
           prompt,
           aspectRatio,
-          style: selectedStyle
+          style: selectedStyle,
+          model: selectedImageModel
         })
       });
       const data = await res.json();
@@ -237,7 +239,7 @@ export const CreativeStudioPanel: React.FC<CreativeStudioPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Style */}
+                 {/* Style */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-amber-200/80">
                     {language === "si" ? "කලාත්මක විලාසය (Art Style)" : "Art Style"}
@@ -264,6 +266,35 @@ export const CreativeStudioPanel: React.FC<CreativeStudioPanelProps> = ({
                     ))}
                   </div>
                 </div>
+
+                {/* AI Image Model Selector (Requested by User) */}
+                {mediaType === "image" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-amber-200/80">
+                      {language === "si" ? "පින්තූර ආකෘතිය (AI Model)" : "AI Image Model"}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "google/imagen-3", label: "🍌 Nano Banana" },
+                        { id: "openai/dall-e-3", label: "💡 GPT Image" },
+                        { id: "black-forest-labs/flux-schnell", label: "⚡ Flux Schnell" }
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setSelectedImageModel(m.id)}
+                          className={`py-2 px-1 rounded-xl text-[10px] font-bold text-center transition cursor-pointer border truncate ${
+                            selectedImageModel === m.id
+                              ? "bg-[#FF6A3D] text-white border-[#FF6A3D] shadow-md shadow-orange-500/10"
+                              : "bg-white/5 text-amber-200/70 border-white/10 hover:border-white/20"
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   type="submit"

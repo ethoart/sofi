@@ -417,7 +417,7 @@ app.get("/api/media", (req, res) => {
 });
 
 app.post("/api/media/generate", async (req, res) => {
-  const { type, prompt, aspectRatio, style } = req.body;
+  const { type, prompt, aspectRatio, style, model } = req.body;
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Prompt is required" });
   }
@@ -425,12 +425,48 @@ app.post("/api/media/generate", async (req, res) => {
   const mediaType = type === "video" ? "video" : "image";
   const aspect = aspectRatio || (mediaType === "video" ? "16:9" : "1:1");
   const selectedStyle = style || "Anime / Manga Artwork";
+  const selectedModel = model || "google/imagen-3";
 
   // Build high quality seeded or AI generated media preview
   const seed = Math.abs(prompt.split("").reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) + (mediaType === "video" ? 888 : 101)) % 1000;
   const dims = aspect === "16:9" ? { w: 1280, h: 720 } : aspect === "9:16" ? { w: 720, h: 1280 } : aspect === "4:3" ? { w: 1024, h: 768 } : { w: 1024, h: 1024 };
 
-  const mediaUrl = `https://picsum.photos/seed/sofi_${seed}_${selectedStyle.replace(/\s+/g, "_")}/${dims.w}/${dims.h}`;
+  let mediaUrl = "";
+  const resolvedOpenRouterKey = process.env.OPENROUTER_API_KEY;
+
+  if (resolvedOpenRouterKey && resolvedOpenRouterKey.trim()) {
+    try {
+      const orRes = await fetch("https://openrouter.ai/api/v1/images", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${resolvedOpenRouterKey}`
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          prompt: `${prompt} (${selectedStyle})`,
+          size: "1024x1024"
+        })
+      });
+      if (orRes.ok) {
+        const orData = await orRes.json();
+        if (orData.data && orData.data[0]) {
+          if (orData.data[0].url) {
+            mediaUrl = orData.data[0].url;
+          } else if (orData.data[0].b64_json) {
+            mediaUrl = `data:image/png;base64,${orData.data[0].b64_json}`;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Media generate via OpenRouter failed:", err);
+    }
+  }
+
+  if (!mediaUrl) {
+    // Zero-latency high-quality real image fallback via Pollinations AI
+    mediaUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(`${prompt} (${selectedStyle})`)}?width=${dims.w}&height=${dims.h}&nologo=true&seed=${seed}`;
+  }
 
   const job = saveMediaJob({
     type: mediaType,
@@ -1023,6 +1059,116 @@ app.post("/api/chat", async (req, res) => {
   const userMsg = (message || "").toLowerCase().trim();
   const currentMode = mode || "general";
   const currentEdition = edition === "free" ? "free" : "pro";
+
+  // 0. Detect direct image generation / drawing request
+  const isImageRequest = 
+    userMsg.includes("@banana") || 
+    userMsg.includes("draw ") || 
+    userMsg.includes("generate image") || 
+    userMsg.includes("create image") || 
+    userMsg.includes("create picture") || 
+    userMsg.includes("make image") || 
+    userMsg.includes("paint ") || 
+    userMsg.includes("generate art") || 
+    userMsg.includes("create art") || 
+    userMsg.includes("design image") || 
+    userMsg.includes("make a picture of");
+
+  if (isImageRequest) {
+    let modelSlug = "google/imagen-3"; // default: Nano Banana
+    let modelLabel = "Nano Banana (Imagen 3)";
+
+    if (userMsg.includes("@gpt")) {
+      modelSlug = "openai/dall-e-3";
+      modelLabel = "GPT Image (DALL-E 3)";
+    } else if (userMsg.includes("@banana")) {
+      modelSlug = "google/imagen-3";
+      modelLabel = "Nano Banana (Imagen 3)";
+    } else if (userMsg.includes("@flux") || userMsg.includes("flux")) {
+      modelSlug = "black-forest-labs/flux-schnell";
+      modelLabel = "Flux Schnell";
+    }
+
+    // Clean prompt to extract subject description
+    let cleanPrompt = message
+      .replace(/@\w+[-.\w]*/gi, "")
+      .replace(/draw\s+a\s+/i, "")
+      .replace(/draw\s+/i, "")
+      .replace(/generate\s+image\s+of\s+/i, "")
+      .replace(/generate\s+image\s+/i, "")
+      .replace(/create\s+image\s+of\s+/i, "")
+      .replace(/create\s+image\s+/i, "")
+      .replace(/create\s+picture\s+of\s+/i, "")
+      .replace(/make\s+image\s+of\s+/i, "")
+      .replace(/paint\s+/i, "")
+      .replace(/generate\s+art\s+of\s+/i, "")
+      .replace(/create\s+art\s+of\s+/i, "")
+      .trim();
+
+    if (!cleanPrompt) {
+      cleanPrompt = "A beautiful futuristic visualization of AI";
+    }
+
+    let imageUrl = "";
+    const resolvedOpenRouterKey = 
+      (typeof clientOpenRouterKey === "string" && clientOpenRouterKey.trim()) ||
+      process.env.OPENROUTER_API_KEY;
+
+    if (resolvedOpenRouterKey && resolvedOpenRouterKey.trim()) {
+      try {
+        const orRes = await fetch("https://openrouter.ai/api/v1/images", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${resolvedOpenRouterKey}`
+          },
+          body: JSON.stringify({
+            model: modelSlug,
+            prompt: cleanPrompt,
+            size: "1024x1024"
+          })
+        });
+        if (orRes.ok) {
+          const orData = await orRes.json();
+          if (orData.data && orData.data[0]) {
+            if (orData.data[0].url) {
+              imageUrl = orData.data[0].url;
+            } else if (orData.data[0].b64_json) {
+              imageUrl = `data:image/png;base64,${orData.data[0].b64_json}`;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("In-chat OpenRouter image call failed:", err);
+      }
+    }
+
+    if (!imageUrl) {
+      const seed = Math.floor(Math.random() * 1000000);
+      imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
+      modelLabel = "Sofi Free (Pollinations AI)";
+    }
+
+    const replyText = currentLang === "si"
+      ? `මෙන්න ඔබ ඉල්ලූ පින්තූරය: **"${cleanPrompt}"**\n\n![${cleanPrompt}](${imageUrl})`
+      : `Here is the image you requested: **"${cleanPrompt}"**\n\n![${cleanPrompt}](${imageUrl})`;
+
+    saveMediaJob({
+      type: "image",
+      prompt: cleanPrompt,
+      aspectRatio: "1:1",
+      style: "Direct Chat Request",
+      status: "completed",
+      mediaUrl: imageUrl
+    });
+
+    return res.json({
+      reply: replyText,
+      modelUsed: modelSlug,
+      modelLabel: modelLabel,
+      routingReason: "Direct Chat Media Request -> Image Generated In-Chat"
+    });
+  }
 
   // 1. Run Sofi's Internal Cognitive SLM: Analyzes memory, language learning, and intent
   const slmAnalysis = analyzePromptWithSlm(message, currentLang);
