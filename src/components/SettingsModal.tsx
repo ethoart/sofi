@@ -37,11 +37,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  const [openRouterKey, setOpenRouterKey] = useState<string>(() => {
+    return userProfile?.preferences?.openRouterKey || (typeof window !== "undefined" ? localStorage.getItem("sofi_openrouter_key") || "" : "");
+  });
+  const [showOpenRouterKey, setShowOpenRouterKey] = useState(false);
+  const [isOpenRouterSaved, setIsOpenRouterSaved] = useState(false);
+  const [isOpenRouterTesting, setIsOpenRouterTesting] = useState(false);
+  const [openRouterTestResult, setOpenRouterTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   React.useEffect(() => {
     if (userProfile?.preferences?.agentRouterKey) {
       setAgentRouterKey(userProfile.preferences.agentRouterKey);
     }
   }, [userProfile?.preferences?.agentRouterKey]);
+
+  React.useEffect(() => {
+    if (userProfile?.preferences?.openRouterKey) {
+      setOpenRouterKey(userProfile.preferences.openRouterKey);
+    }
+  }, [userProfile?.preferences?.openRouterKey]);
 
   const handleSaveKey = async () => {
     const key = agentRouterKey.trim();
@@ -110,6 +124,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleSaveOpenRouterKey = async () => {
+    const key = openRouterKey.trim();
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sofi_openrouter_key", key);
+    }
+    
+    // Sync key to server runtime environment immediately
+    if (key) {
+      fetch("/api/config/openrouter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key })
+      }).catch(() => {});
+    }
+
+    if (userProfile && onSaveUserProfile) {
+      await onSaveUserProfile({
+        ...userProfile,
+        preferences: {
+          ...userProfile.preferences,
+          openRouterKey: key
+        }
+      });
+    }
+    setIsOpenRouterSaved(true);
+    setTimeout(() => setIsOpenRouterSaved(false), 2500);
+  };
+
+  const handleTestOpenRouterKey = async () => {
+    const keyToTest = openRouterKey.trim();
+    if (!keyToTest) return;
+    setIsOpenRouterTesting(true);
+    setOpenRouterTestResult(null);
+
+    try {
+      const res = await fetch("/api/openrouter/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: keyToTest })
+      });
+      const data = await res.json();
+      setOpenRouterTestResult({
+        success: !!data.success,
+        message: data.message || (data.success ? "Key verified! Connected to OpenRouter." : "Verification failed.")
+      });
+
+      if (data.success) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("sofi_openrouter_key", keyToTest);
+        }
+        if (userProfile && onSaveUserProfile) {
+          onSaveUserProfile({
+            ...userProfile,
+            preferences: {
+              ...userProfile.preferences,
+              openRouterKey: keyToTest
+            }
+          }).catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      setOpenRouterTestResult({
+        success: false,
+        message: err?.message || "Failed to reach server to test key."
+      });
+    } finally {
+      setIsOpenRouterTesting(false);
     }
   };
 
@@ -330,12 +414,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* AgentRouter API Key Configuration Box */}
+            {/* AI Engine Status Banner */}
+            <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <div>
+                  <p className="text-xs font-bold text-emerald-200">
+                    AI Studio Engine Active (Zero Key Setup Required)
+                  </p>
+                  <p className="text-[11px] text-emerald-300/70">
+                    Sofi runs seamlessly with the built-in server-side intelligence engine. You do not need to provide a Gemini API key.
+                  </p>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold shrink-0">
+                Ready
+              </span>
+            </div>
+
+            {/* AgentRouter API Key Configuration Box (Optional) */}
             <div className="p-4 rounded-2xl bg-[#1A0D0A] border border-[#FF6A3D]/30 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-extrabold text-white">
                   <Key className="w-4 h-4 text-[#FF6A3D]" />
-                  <span>AgentRouter API Key (https://agentrouter.org)</span>
+                  <span>AgentRouter API Key (Optional)</span>
                 </div>
                 <a
                   href="https://agentrouter.org"
@@ -429,13 +531,112 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
 
+            {/* OpenRouter API Key Configuration Box (Highly Recommended) */}
+            <div className="p-4 rounded-2xl bg-[#0C121E] border border-blue-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-extrabold text-white">
+                  <Key className="w-4 h-4 text-blue-400" />
+                  <span>OpenRouter API Key (Highly Recommended)</span>
+                </div>
+                <a
+                  href="https://openrouter.ai"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-blue-400 hover:underline flex items-center gap-1 font-bold"
+                >
+                  <span>Get OpenRouter Key</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <p className="text-[11px] text-blue-200/70 leading-relaxed">
+                Enter your <a href="https://openrouter.ai" target="_blank" rel="noreferrer" className="text-blue-400 underline">openrouter.ai</a> API key to enjoy seamless access to Claude 3.7 Sonnet, DeepSeek R1, DeepSeek V3, Claude 3.5 Sonnet, and GPT-4o with zero WAF blocks or latency.
+              </p>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showOpenRouterKey ? "text" : "password"}
+                    value={openRouterKey}
+                    onChange={(e) => {
+                      setOpenRouterKey(e.target.value);
+                      setOpenRouterTestResult(null);
+                    }}
+                    placeholder="sk-or-... (OpenRouter API Key)"
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenRouterKey(!showOpenRouterKey)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-200/50 hover:text-white"
+                  >
+                    {showOpenRouterKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestOpenRouterKey}
+                  disabled={isOpenRouterTesting || !openRouterKey.trim()}
+                  className="px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isOpenRouterTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" /> : <Zap className="w-3.5 h-3.5 text-blue-400" />}
+                  <span>{isOpenRouterTesting ? "Testing..." : "Test Key"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveOpenRouterKey}
+                  disabled={!openRouterKey.trim()}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isOpenRouterSaved
+                      ? "bg-emerald-500 text-black shadow-md"
+                      : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20"
+                  }`}
+                >
+                  {isOpenRouterSaved ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                  <span>{isOpenRouterSaved ? "Saved!" : "Save Key"}</span>
+                </button>
+              </div>
+
+              {/* Test Result Feedback */}
+              {openRouterTestResult && (
+                <div className={`p-2.5 rounded-xl text-xs flex items-start gap-2 border ${
+                  openRouterTestResult.success
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                    : "bg-red-500/10 border-red-500/30 text-red-300"
+                }`}>
+                  {openRouterTestResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                  )}
+                  <div className="flex-1 leading-snug">
+                    <span className="font-bold">{openRouterTestResult.success ? "Connection Verified: " : "Connection Error: "}</span>
+                    <span>{openRouterTestResult.message}</span>
+                  </div>
+                </div>
+              )}
+
+              {openRouterKey ? (
+                <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>OpenRouter Key configured • High-capacity models active</span>
+                </div>
+              ) : (
+                <div className="text-[10px] text-blue-400/80">
+                  <span>No key set yet • Easily link your key from https://openrouter.ai</span>
+                </div>
+              )}
+            </div>
+
             {/* Status Summary Banner */}
             <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-amber-200/80">
                 <Sparkles className="w-4 h-4 text-[#FF6A3D]" />
                 <span>
                   {currentEdition === "pro"
-                    ? "Sofi Pro active via https://agentrouter.org (Claude Opus 5, DeepSeek v4, GLM, GPT-5.6 Sol)."
+                    ? (openRouterKey ? "Sofi Pro active via OpenRouter." : "Sofi Pro active via AgentRouter.")
                     : "Sofi Free active with Local Qwen 2.5 + LBGM with real-time web retrieval."}
                 </span>
               </div>

@@ -1,0 +1,19 @@
+[
+  {
+    "_id": "6a9d93bf85bb7e0116ea4f52",
+    "id": "session-welcome",
+    "userId": "user-default",
+    "title": "Welcome & Introduction to Sofi",
+    "mode": "general",
+    "messages": [
+      {
+        "id": "welcome-1",
+        "sender": "sofi",
+        "text": "Hello! I am Sofi, your intelligent AI companion running directly on AWS. I have full persistent memory backed by MongoDB, voice interaction in English and Sinhala, and specialized workspaces for Coding, Deep Research, and Creative Image/Video generation. How can I assist you today?",
+        "timestamp": "04:24 PM"
+      }
+    ],
+    "createdAt": "2026-09-06T16:24:31.084Z",
+    "updatedAt": "2026-09-06T16:24:31.084Z"
+  }
+]

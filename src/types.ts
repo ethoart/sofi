@@ -13,6 +13,12 @@ export type SofiEdition = 'free' | 'pro';
 export type SupportedAiModel =
   | 'auto'
   | 'lbgm'
+  | 'claude-3-7-sonnet'
+  | 'claude-3-5-sonnet'
+  | 'claude-opus'
+  | 'deepseek-r1'
+  | 'deepseek-v3'
+  | 'llama-3-3-70b'
   | 'claude-opus-4-8'
   | 'claude-opus-5'
   | 'deepseek-v4-flash'
@@ -82,6 +88,7 @@ export interface UserProfile {
     voicePitch: number;
     formality: 'casual' | 'balanced' | 'formal';
     autoSpeak: boolean;
+    openRouterKey?: string;
     agentRouterKey?: string;
   };
   customInstructions: string;

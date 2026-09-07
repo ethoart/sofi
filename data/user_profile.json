@@ -1,0 +1,27 @@
+{
+  "id": "user-default",
+  "name": "User",
+  "nickname": "Friend",
+  "bio": "Software developer and technology enthusiast building with Sofi AI on AWS.",
+  "occupation": "Engineer & Creator",
+  "language": "en",
+  "interests": [
+    "AI agents",
+    "Cloud architecture",
+    "Sinhala NLP",
+    "Automation"
+  ],
+  "goals": [
+    "Automate daily tasks with voice",
+    "Build custom skills for AWS EC2",
+    "Learn and teach language nuances"
+  ],
+  "preferences": {
+    "voiceSpeed": 1,
+    "voicePitch": 1.15,
+    "formality": "balanced",
+    "autoSpeak": false
+  },
+  "customInstructions": "Call me by my nickname when appropriate. Remind me of ongoing tasks and keep answers concise and helpful.",
+  "updatedAt": "2026-09-06T16:24:31.069Z"
+}

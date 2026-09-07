@@ -534,6 +534,74 @@ app.post("/api/agentrouter/verify", async (req, res) => {
   }
 });
 
+// Configure OpenRouter API Key directly
+app.post("/api/config/openrouter", (req, res) => {
+  const { key } = req.body;
+  if (typeof key === "string" && key.trim()) {
+    const trimmed = key.trim();
+    process.env.OPENROUTER_API_KEY = trimmed;
+    const profile = readJsonSafe(USER_PROFILE_FILE, initUserProfile());
+    profile.preferences = {
+      ...(profile.preferences || {}),
+      openRouterKey: trimmed
+    };
+    writeJsonSafe(USER_PROFILE_FILE, profile);
+    return res.json({ success: true, message: "OpenRouter API key saved and activated!" });
+  }
+  res.status(400).json({ error: "Invalid key provided" });
+});
+
+// Verify OpenRouter API Key live with the gateway
+app.post("/api/openrouter/verify", async (req, res) => {
+  const key = (req.body.key && typeof req.body.key === "string" && req.body.key.trim())
+    ? req.body.key.trim()
+    : process.env.OPENROUTER_API_KEY;
+
+  if (!key) {
+    return res.status(400).json({ success: false, message: "No OpenRouter API key provided to test." });
+  }
+
+  try {
+    const testRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3-8b-instruct:free",
+        messages: [{ role: "user", content: "hi" }]
+      })
+    });
+
+    const responseText = await testRes.text();
+    if (testRes.ok) {
+      process.env.OPENROUTER_API_KEY = key;
+      const profile = readJsonSafe(USER_PROFILE_FILE, initUserProfile());
+      profile.preferences = {
+        ...(profile.preferences || {}),
+        openRouterKey: key
+      };
+      writeJsonSafe(USER_PROFILE_FILE, profile);
+      return res.json({ success: true, message: "OpenRouter key verified and connected successfully!" });
+    }
+
+    let parsedMsg = responseText.slice(0, 200);
+    try {
+      const json = JSON.parse(responseText);
+      if (json.error?.message) parsedMsg = json.error.message;
+    } catch (_) {}
+
+    return res.json({
+      success: false,
+      status: testRes.status,
+      message: parsedMsg || `HTTP ${testRes.status} error from OpenRouter.`
+    });
+  } catch (err: any) {
+    return res.json({ success: false, message: err?.message || "Could not reach OpenRouter gateway." });
+  }
+});
+
 // 2. Sofi Profile
 app.get("/api/profile/sofi", (req, res) => {
   const profile = readJsonSafe(SOFI_PROFILE_FILE, initSofiProfile());
@@ -948,6 +1016,7 @@ app.post("/api/chat", async (req, res) => {
     attachments, 
     forceWebSearch,
     agentRouterKey: clientAgentRouterKey,
+    openRouterKey: clientOpenRouterKey,
     userProfile: clientUserProfile
   } = req.body;
   const currentLang = language === "si" ? "si" : "en";
@@ -1027,6 +1096,16 @@ app.post("/api/chat", async (req, res) => {
     process.env.AGENTROUTER_API_KEY = resolvedAgentRouterKey;
   }
 
+  const resolvedOpenRouterKey = 
+    (typeof clientOpenRouterKey === "string" && clientOpenRouterKey.trim()) ||
+    (typeof activeUserProfile?.preferences?.openRouterKey === "string" && activeUserProfile.preferences.openRouterKey.trim()) ||
+    (diskUserProfile?.preferences?.openRouterKey as string | undefined) ||
+    process.env.OPENROUTER_API_KEY;
+
+  if (resolvedOpenRouterKey && resolvedOpenRouterKey.trim()) {
+    process.env.OPENROUTER_API_KEY = resolvedOpenRouterKey;
+  }
+
   const allMemories = readJsonSafe(MEMORIES_FILE, []);
   const allVocab = readJsonSafe(VOCAB_FILE, []);
 
@@ -1042,6 +1121,7 @@ app.post("/api/chat", async (req, res) => {
     systemPrompt,
     userProfile: activeUserProfile,
     agentRouterKey: resolvedAgentRouterKey,
+    openRouterKey: resolvedOpenRouterKey,
     memories: allMemories,
     vocab: allVocab,
     forceWebSearch: !!forceWebSearch

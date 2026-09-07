@@ -4,7 +4,7 @@ import {
   CheckCircle2, ArrowRight, MessageSquare, History, Radio, BookmarkPlus,
   Menu, Plus, Smartphone, Code2, Microscope, Palette, QrCode, Copy, Check,
   Paperclip, Image as ImageIcon, FileText, X, ChevronDown, Cpu, Bot, UploadCloud,
-  LogOut, PanelRight, PanelRightClose, Globe, Search, Settings, Zap
+  LogOut, PanelRight, PanelRightClose, Globe, Search, Settings, Zap, Wallet
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -1276,6 +1276,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 </span>
                 {[
                   { id: "auto", label: "⚡ Auto Router", shortcut: "auto" },
+                  { id: "gemini", label: "✨ Gemini 2.5 Flash", shortcut: "gemini" },
                   { id: "chatgpt", label: "💡 ChatGPT (GPT-4o)", shortcut: "gpt" },
                   { id: "claude", label: "🧠 Claude 3.5 Sonnet", shortcut: "claude" },
                   { id: "deepseek-v4-flash", label: "🚀 DeepSeek v4", shortcut: "deepseek" },
@@ -1413,7 +1414,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   }
                 }}
                 placeholder={
-                  selectedModel === "chatgpt"
+                  selectedModel === "gemini"
+                    ? (language === "si" ? "Gemini 2.5 Flash වෙතින් අසන්න (උදා: 'gemini explain quantum physics')..." : "Ask with Gemini 2.5 Flash (Direct Cloud Inference)...")
+                    : selectedModel === "chatgpt"
                     ? (language === "si" ? "ChatGPT (GPT-4o) වෙතින් අසන්න (උදා: 'gpt make website')..." : "Ask with ChatGPT (GPT-4o via AgentRouter)...")
                     : selectedModel === "claude"
                     ? (language === "si" ? "Claude 3.5 Sonnet වෙතින් අසන්න (උදා: 'claude write code')..." : "Ask with Claude 3.5 Sonnet (via AgentRouter)...")
